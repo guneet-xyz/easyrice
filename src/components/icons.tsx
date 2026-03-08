@@ -8,14 +8,14 @@ import {
   PiGithubLogo,
   PiGithubLogoDuotone,
   PiGoogleLogo,
-  PiGoogleLogoDuotone
+  PiGoogleLogoDuotone,
 } from "react-icons/pi"
 
 export function DynamicIconThemed({
   lightNoHover,
   lightHover,
   darkNoHover,
-  darkHover
+  darkHover,
 }: {
   lightNoHover: React.ReactNode
   lightHover: React.ReactNode
@@ -43,7 +43,7 @@ export function DynamicIconThemed({
 export function DynamicIcon({
   className,
   noHover,
-  hover
+  hover,
 }: {
   className?: string
   noHover: React.ReactNode
