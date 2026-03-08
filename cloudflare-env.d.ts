@@ -338,7 +338,7 @@ interface ServiceWorkerGlobalScope extends WorkerGlobalScope {
   reportError(error: any): void
   fetch(
     input: RequestInfo | URL,
-    init?: RequestInit<RequestInitCfProperties>
+    init?: RequestInit<RequestInitCfProperties>,
   ): Promise<Response>
   self: ServiceWorkerGlobalScope
   crypto: Crypto
@@ -409,14 +409,14 @@ interface ServiceWorkerGlobalScope extends WorkerGlobalScope {
 declare function addEventListener<Type extends keyof WorkerGlobalScopeEventMap>(
   type: Type,
   handler: EventListenerOrEventListenerObject<WorkerGlobalScopeEventMap[Type]>,
-  options?: EventTargetAddEventListenerOptions | boolean
+  options?: EventTargetAddEventListenerOptions | boolean,
 ): void
 declare function removeEventListener<
-  Type extends keyof WorkerGlobalScopeEventMap
+  Type extends keyof WorkerGlobalScopeEventMap,
 >(
   type: Type,
   handler: EventListenerOrEventListenerObject<WorkerGlobalScopeEventMap[Type]>,
-  options?: EventTargetEventListenerOptions | boolean
+  options?: EventTargetEventListenerOptions | boolean,
 ): void
 /**
  * The **`dispatchEvent()`** method of the EventTarget sends an Event to the object, (synchronously) invoking the affected event listeners in the appropriate order.
@@ -424,7 +424,7 @@ declare function removeEventListener<
  * [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
  */
 declare function dispatchEvent(
-  event: WorkerGlobalScopeEventMap[keyof WorkerGlobalScopeEventMap]
+  event: WorkerGlobalScopeEventMap[keyof WorkerGlobalScopeEventMap],
 ): boolean
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/btoa) */
 declare function btoa(data: string): string
@@ -433,7 +433,7 @@ declare function atob(data: string): string
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/setTimeout) */
 declare function setTimeout(
   callback: (...args: any[]) => void,
-  msDelay?: number
+  msDelay?: number,
 ): number
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/setTimeout) */
 declare function setTimeout<Args extends any[]>(
@@ -446,7 +446,7 @@ declare function clearTimeout(timeoutId: number | null): void
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/setInterval) */
 declare function setInterval(
   callback: (...args: any[]) => void,
-  msDelay?: number
+  msDelay?: number,
 ): number
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/setInterval) */
 declare function setInterval<Args extends any[]>(
@@ -461,14 +461,14 @@ declare function queueMicrotask(task: Function): void
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/structuredClone) */
 declare function structuredClone<T>(
   value: T,
-  options?: StructuredSerializeOptions
+  options?: StructuredSerializeOptions,
 ): T
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/reportError) */
 declare function reportError(error: any): void
 /* [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/fetch) */
 declare function fetch(
   input: RequestInfo | URL,
-  init?: RequestInit<RequestInitCfProperties>
+  init?: RequestInit<RequestInitCfProperties>,
 ): Promise<Response>
 declare const self: ServiceWorkerGlobalScope
 /**
@@ -507,42 +507,42 @@ interface ExecutionContext<Props = unknown> {
 type ExportedHandlerFetchHandler<Env = unknown, CfHostMetadata = unknown> = (
   request: Request<CfHostMetadata, IncomingRequestCfProperties<CfHostMetadata>>,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => Response | Promise<Response>
 type ExportedHandlerTailHandler<Env = unknown> = (
   events: TraceItem[],
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 type ExportedHandlerTraceHandler<Env = unknown> = (
   traces: TraceItem[],
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 type ExportedHandlerTailStreamHandler<Env = unknown> = (
   event: TailStream.TailEvent<TailStream.Onset>,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => TailStream.TailEventHandlerType | Promise<TailStream.TailEventHandlerType>
 type ExportedHandlerScheduledHandler<Env = unknown> = (
   controller: ScheduledController,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 type ExportedHandlerQueueHandler<Env = unknown, Message = unknown> = (
   batch: MessageBatch<Message>,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 type ExportedHandlerTestHandler<Env = unknown> = (
   controller: TestController,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 interface ExportedHandler<
   Env = unknown,
   QueueHandlerMessage = unknown,
-  CfHostMetadata = unknown
+  CfHostMetadata = unknown,
 > {
   fetch?: ExportedHandlerFetchHandler<Env, CfHostMetadata>
   tail?: ExportedHandlerTailHandler<Env>
@@ -575,18 +575,18 @@ interface DurableObject {
   alarm?(alarmInfo?: AlarmInvocationInfo): void | Promise<void>
   webSocketMessage?(
     ws: WebSocket,
-    message: string | ArrayBuffer
+    message: string | ArrayBuffer,
   ): void | Promise<void>
   webSocketClose?(
     ws: WebSocket,
     code: number,
     reason: string,
-    wasClean: boolean
+    wasClean: boolean,
   ): void | Promise<void>
   webSocketError?(ws: WebSocket, error: unknown): void | Promise<void>
 }
 type DurableObjectStub<
-  T extends Rpc.DurableObjectBranded | undefined = undefined
+  T extends Rpc.DurableObjectBranded | undefined = undefined,
 > = Fetcher<
   T,
   "alarm" | "webSocketMessage" | "webSocketClose" | "webSocketError"
@@ -600,23 +600,23 @@ interface DurableObjectId {
   readonly name?: string
 }
 declare abstract class DurableObjectNamespace<
-  T extends Rpc.DurableObjectBranded | undefined = undefined
+  T extends Rpc.DurableObjectBranded | undefined = undefined,
 > {
   newUniqueId(
-    options?: DurableObjectNamespaceNewUniqueIdOptions
+    options?: DurableObjectNamespaceNewUniqueIdOptions,
   ): DurableObjectId
   idFromName(name: string): DurableObjectId
   idFromString(id: string): DurableObjectId
   get(
     id: DurableObjectId,
-    options?: DurableObjectNamespaceGetDurableObjectOptions
+    options?: DurableObjectNamespaceGetDurableObjectOptions,
   ): DurableObjectStub<T>
   getByName(
     name: string,
-    options?: DurableObjectNamespaceGetDurableObjectOptions
+    options?: DurableObjectNamespaceGetDurableObjectOptions,
   ): DurableObjectStub<T>
   jurisdiction(
-    jurisdiction: DurableObjectJurisdiction
+    jurisdiction: DurableObjectJurisdiction,
   ): DurableObjectNamespace<T>
 }
 type DurableObjectJurisdiction = "eu" | "fedramp" | "fedramp-high"
@@ -639,7 +639,7 @@ interface DurableObjectNamespaceGetDurableObjectOptions {
   routingMode?: DurableObjectRoutingMode
 }
 interface DurableObjectClass<
-  _T extends Rpc.DurableObjectBranded | undefined = undefined
+  _T extends Rpc.DurableObjectBranded | undefined = undefined,
 > {}
 interface DurableObjectState<Props = unknown> {
   waitUntil(promise: Promise<any>): void
@@ -662,21 +662,21 @@ interface DurableObjectState<Props = unknown> {
 interface DurableObjectTransaction {
   get<T = unknown>(
     key: string,
-    options?: DurableObjectGetOptions
+    options?: DurableObjectGetOptions,
   ): Promise<T | undefined>
   get<T = unknown>(
     keys: string[],
-    options?: DurableObjectGetOptions
+    options?: DurableObjectGetOptions,
   ): Promise<Map<string, T>>
   list<T = unknown>(options?: DurableObjectListOptions): Promise<Map<string, T>>
   put<T>(
     key: string,
     value: T,
-    options?: DurableObjectPutOptions
+    options?: DurableObjectPutOptions,
   ): Promise<void>
   put<T>(
     entries: Record<string, T>,
-    options?: DurableObjectPutOptions
+    options?: DurableObjectPutOptions,
   ): Promise<void>
   delete(key: string, options?: DurableObjectPutOptions): Promise<boolean>
   delete(keys: string[], options?: DurableObjectPutOptions): Promise<number>
@@ -684,39 +684,39 @@ interface DurableObjectTransaction {
   getAlarm(options?: DurableObjectGetAlarmOptions): Promise<number | null>
   setAlarm(
     scheduledTime: number | Date,
-    options?: DurableObjectSetAlarmOptions
+    options?: DurableObjectSetAlarmOptions,
   ): Promise<void>
   deleteAlarm(options?: DurableObjectSetAlarmOptions): Promise<void>
 }
 interface DurableObjectStorage {
   get<T = unknown>(
     key: string,
-    options?: DurableObjectGetOptions
+    options?: DurableObjectGetOptions,
   ): Promise<T | undefined>
   get<T = unknown>(
     keys: string[],
-    options?: DurableObjectGetOptions
+    options?: DurableObjectGetOptions,
   ): Promise<Map<string, T>>
   list<T = unknown>(options?: DurableObjectListOptions): Promise<Map<string, T>>
   put<T>(
     key: string,
     value: T,
-    options?: DurableObjectPutOptions
+    options?: DurableObjectPutOptions,
   ): Promise<void>
   put<T>(
     entries: Record<string, T>,
-    options?: DurableObjectPutOptions
+    options?: DurableObjectPutOptions,
   ): Promise<void>
   delete(key: string, options?: DurableObjectPutOptions): Promise<boolean>
   delete(keys: string[], options?: DurableObjectPutOptions): Promise<number>
   deleteAll(options?: DurableObjectPutOptions): Promise<void>
   transaction<T>(
-    closure: (txn: DurableObjectTransaction) => Promise<T>
+    closure: (txn: DurableObjectTransaction) => Promise<T>,
   ): Promise<T>
   getAlarm(options?: DurableObjectGetAlarmOptions): Promise<number | null>
   setAlarm(
     scheduledTime: number | Date,
-    options?: DurableObjectSetAlarmOptions
+    options?: DurableObjectSetAlarmOptions,
   ): Promise<void>
   deleteAlarm(options?: DurableObjectSetAlarmOptions): Promise<void>
   sync(): Promise<void>
@@ -908,7 +908,7 @@ type EventListenerOrEventListenerObject<EventType extends Event = Event> =
  * [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget)
  */
 declare class EventTarget<
-  EventMap extends Record<string, Event> = Record<string, Event>
+  EventMap extends Record<string, Event> = Record<string, Event>,
 > {
   constructor()
   /**
@@ -919,7 +919,7 @@ declare class EventTarget<
   addEventListener<Type extends keyof EventMap>(
     type: Type,
     handler: EventListenerOrEventListenerObject<EventMap[Type]>,
-    options?: EventTargetAddEventListenerOptions | boolean
+    options?: EventTargetAddEventListenerOptions | boolean,
   ): void
   /**
    * The **`removeEventListener()`** method of the EventTarget interface removes an event listener previously registered with EventTarget.addEventListener() from the target.
@@ -929,7 +929,7 @@ declare class EventTarget<
   removeEventListener<Type extends keyof EventMap>(
     type: Type,
     handler: EventListenerOrEventListenerObject<EventMap[Type]>,
-    options?: EventTargetEventListenerOptions | boolean
+    options?: EventTargetEventListenerOptions | boolean,
   ): void
   /**
    * The **`dispatchEvent()`** method of the EventTarget sends an Event to the object, (synchronously) invoking the affected event listeners in the appropriate order.
@@ -1064,7 +1064,7 @@ interface CustomEventCustomEventInit {
 declare class Blob {
   constructor(
     type?: ((ArrayBuffer | ArrayBufferView) | string | Blob)[],
-    options?: BlobOptions
+    options?: BlobOptions,
   )
   /**
    * The **`size`** read-only property of the Blob interface returns the size of the Blob or File in bytes.
@@ -1121,7 +1121,7 @@ declare class File extends Blob {
   constructor(
     bits: ((ArrayBuffer | ArrayBufferView) | string | Blob)[] | undefined,
     name: string,
-    options?: FileOptions
+    options?: FileOptions,
   )
   /**
    * The **`name`** read-only property of the File interface returns the name of the file represented by a File object.
@@ -1163,12 +1163,12 @@ declare abstract class Cache {
   /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#delete) */
   delete(
     request: RequestInfo | URL,
-    options?: CacheQueryOptions
+    options?: CacheQueryOptions,
   ): Promise<boolean>
   /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#match) */
   match(
     request: RequestInfo | URL,
-    options?: CacheQueryOptions
+    options?: CacheQueryOptions,
   ): Promise<Response | undefined>
   /* [Cloudflare Docs Reference](https://developers.cloudflare.com/workers/runtime-apis/cache/#put) */
   put(request: RequestInfo | URL, response: Response): Promise<void>
@@ -1206,7 +1206,7 @@ declare abstract class Crypto {
       | Int32Array
       | Uint32Array
       | BigInt64Array
-      | BigUint64Array
+      | BigUint64Array,
   >(buffer: T): T
   /**
    * The **`randomUUID()`** method of the Crypto interface is used to generate a v4 UUID using a cryptographically secure random number generator.
@@ -1232,7 +1232,7 @@ declare abstract class SubtleCrypto {
   encrypt(
     algorithm: string | SubtleCryptoEncryptAlgorithm,
     key: CryptoKey,
-    plainText: ArrayBuffer | ArrayBufferView
+    plainText: ArrayBuffer | ArrayBufferView,
   ): Promise<ArrayBuffer>
   /**
    * The **`decrypt()`** method of the SubtleCrypto interface decrypts some encrypted data.
@@ -1242,7 +1242,7 @@ declare abstract class SubtleCrypto {
   decrypt(
     algorithm: string | SubtleCryptoEncryptAlgorithm,
     key: CryptoKey,
-    cipherText: ArrayBuffer | ArrayBufferView
+    cipherText: ArrayBuffer | ArrayBufferView,
   ): Promise<ArrayBuffer>
   /**
    * The **`sign()`** method of the SubtleCrypto interface generates a digital signature.
@@ -1252,7 +1252,7 @@ declare abstract class SubtleCrypto {
   sign(
     algorithm: string | SubtleCryptoSignAlgorithm,
     key: CryptoKey,
-    data: ArrayBuffer | ArrayBufferView
+    data: ArrayBuffer | ArrayBufferView,
   ): Promise<ArrayBuffer>
   /**
    * The **`verify()`** method of the SubtleCrypto interface verifies a digital signature.
@@ -1263,7 +1263,7 @@ declare abstract class SubtleCrypto {
     algorithm: string | SubtleCryptoSignAlgorithm,
     key: CryptoKey,
     signature: ArrayBuffer | ArrayBufferView,
-    data: ArrayBuffer | ArrayBufferView
+    data: ArrayBuffer | ArrayBufferView,
   ): Promise<boolean>
   /**
    * The **`digest()`** method of the SubtleCrypto interface generates a _digest_ of the given data, using the specified hash function.
@@ -1272,7 +1272,7 @@ declare abstract class SubtleCrypto {
    */
   digest(
     algorithm: string | SubtleCryptoHashAlgorithm,
-    data: ArrayBuffer | ArrayBufferView
+    data: ArrayBuffer | ArrayBufferView,
   ): Promise<ArrayBuffer>
   /**
    * The **`generateKey()`** method of the SubtleCrypto interface is used to generate a new key (for symmetric algorithms) or key pair (for public-key algorithms).
@@ -1282,7 +1282,7 @@ declare abstract class SubtleCrypto {
   generateKey(
     algorithm: string | SubtleCryptoGenerateKeyAlgorithm,
     extractable: boolean,
-    keyUsages: string[]
+    keyUsages: string[],
   ): Promise<CryptoKey | CryptoKeyPair>
   /**
    * The **`deriveKey()`** method of the SubtleCrypto interface can be used to derive a secret key from a master key.
@@ -1294,7 +1294,7 @@ declare abstract class SubtleCrypto {
     baseKey: CryptoKey,
     derivedKeyAlgorithm: string | SubtleCryptoImportKeyAlgorithm,
     extractable: boolean,
-    keyUsages: string[]
+    keyUsages: string[],
   ): Promise<CryptoKey>
   /**
    * The **`deriveBits()`** method of the key.
@@ -1304,7 +1304,7 @@ declare abstract class SubtleCrypto {
   deriveBits(
     algorithm: string | SubtleCryptoDeriveKeyAlgorithm,
     baseKey: CryptoKey,
-    length?: number | null
+    length?: number | null,
   ): Promise<ArrayBuffer>
   /**
    * The **`importKey()`** method of the SubtleCrypto interface imports a key: that is, it takes as input a key in an external, portable format and gives you a CryptoKey object that you can use in the Web Crypto API.
@@ -1316,7 +1316,7 @@ declare abstract class SubtleCrypto {
     keyData: (ArrayBuffer | ArrayBufferView) | JsonWebKey,
     algorithm: string | SubtleCryptoImportKeyAlgorithm,
     extractable: boolean,
-    keyUsages: string[]
+    keyUsages: string[],
   ): Promise<CryptoKey>
   /**
    * The **`exportKey()`** method of the SubtleCrypto interface exports a key: that is, it takes as input a CryptoKey object and gives you the key in an external, portable format.
@@ -1333,7 +1333,7 @@ declare abstract class SubtleCrypto {
     format: string,
     key: CryptoKey,
     wrappingKey: CryptoKey,
-    wrapAlgorithm: string | SubtleCryptoEncryptAlgorithm
+    wrapAlgorithm: string | SubtleCryptoEncryptAlgorithm,
   ): Promise<ArrayBuffer>
   /**
    * The **`unwrapKey()`** method of the SubtleCrypto interface 'unwraps' a key.
@@ -1347,11 +1347,11 @@ declare abstract class SubtleCrypto {
     unwrapAlgorithm: string | SubtleCryptoEncryptAlgorithm,
     unwrappedKeyAlgorithm: string | SubtleCryptoImportKeyAlgorithm,
     extractable: boolean,
-    keyUsages: string[]
+    keyUsages: string[],
   ): Promise<CryptoKey>
   timingSafeEqual(
     a: ArrayBuffer | ArrayBufferView,
-    b: ArrayBuffer | ArrayBufferView
+    b: ArrayBuffer | ArrayBufferView,
   ): boolean
 }
 /**
@@ -1511,7 +1511,7 @@ declare class TextDecoder {
    */
   decode(
     input?: ArrayBuffer | ArrayBufferView,
-    options?: TextDecoderDecodeOptions
+    options?: TextDecoderDecodeOptions,
   ): string
   get encoding(): string
   get fatal(): boolean
@@ -1732,9 +1732,9 @@ declare class FormData {
       this: This,
       value: File | string,
       key: string,
-      parent: FormData
+      parent: FormData,
     ) => void,
-    thisArg?: This
+    thisArg?: This,
   ): void
   [Symbol.iterator](): IterableIterator<[key: string, value: File | string]>
 }
@@ -1745,7 +1745,7 @@ declare class HTMLRewriter {
   constructor()
   on(
     selector: string,
-    handlers: HTMLRewriterElementContentHandlers
+    handlers: HTMLRewriterElementContentHandlers,
   ): HTMLRewriter
   onDocument(handlers: HTMLRewriterDocumentContentHandlers): HTMLRewriter
   transform(response: Response): Response
@@ -1777,29 +1777,29 @@ interface Element {
   removeAttribute(name: string): Element
   before(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   after(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   prepend(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   append(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   replace(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   remove(): Element
   removeAndKeepContent(): Element
   setInnerContent(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Element
   onEndTag(handler: (tag: EndTag) => void | Promise<void>): void
 }
@@ -1807,11 +1807,11 @@ interface EndTag {
   name: string
   before(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): EndTag
   after(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): EndTag
   remove(): EndTag
 }
@@ -1829,15 +1829,15 @@ interface Text {
   readonly removed: boolean
   before(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Text
   after(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Text
   replace(
     content: string | ReadableStream | Response,
-    options?: ContentOptions
+    options?: ContentOptions,
   ): Text
   remove(): Text
 }
@@ -1911,7 +1911,7 @@ declare class Headers {
   delete(name: string): void
   forEach<This = unknown>(
     callback: (this: This, value: string, key: string, parent: Headers) => void,
-    thisArg?: This
+    thisArg?: This,
   ): void
   /* Returns an iterator allowing to go through all key/value pairs contained in this object. */
   entries(): IterableIterator<[key: string, value: string]>
@@ -2038,7 +2038,7 @@ declare var Request: {
   prototype: Request
   new <CfHostMetadata = unknown, Cf = CfProperties<CfHostMetadata>>(
     input: RequestInfo<CfProperties> | URL,
-    init?: RequestInit<Cf>
+    init?: RequestInit<Cf>,
   ): Request<CfHostMetadata, Cf>
 }
 /**
@@ -2048,7 +2048,7 @@ declare var Request: {
  */
 interface Request<
   CfHostMetadata = unknown,
-  Cf = CfProperties<CfHostMetadata>
+  Cf = CfProperties<CfHostMetadata>,
 > extends Body {
   /**
    * The **`clone()`** method of the Request interface creates a copy of the current `Request` object.
@@ -2131,7 +2131,7 @@ type Service<
     | (new (...args: any[]) => Rpc.WorkerEntrypointBranded)
     | Rpc.WorkerEntrypointBranded
     | ExportedHandler<any, any, any>
-    | undefined = undefined
+    | undefined = undefined,
 > = T extends new (...args: any[]) => Rpc.WorkerEntrypointBranded
   ? Fetcher<InstanceType<T>>
   : T extends Rpc.WorkerEntrypointBranded
@@ -2141,7 +2141,7 @@ type Service<
       : Fetcher<undefined>
 type Fetcher<
   T extends Rpc.EntrypointBranded | undefined = undefined,
-  Reserved extends string = never
+  Reserved extends string = never,
 > = (T extends Rpc.EntrypointBranded
   ? Rpc.Provider<T, Reserved | "fetch" | "connect">
   : unknown) & {
@@ -2168,110 +2168,110 @@ type KVNamespaceListResult<Metadata, Key extends string = string> =
 interface KVNamespace<Key extends string = string> {
   get(
     key: Key,
-    options?: Partial<KVNamespaceGetOptions<undefined>>
+    options?: Partial<KVNamespaceGetOptions<undefined>>,
   ): Promise<string | null>
   get(key: Key, type: "text"): Promise<string | null>
   get<ExpectedValue = unknown>(
     key: Key,
-    type: "json"
+    type: "json",
   ): Promise<ExpectedValue | null>
   get(key: Key, type: "arrayBuffer"): Promise<ArrayBuffer | null>
   get(key: Key, type: "stream"): Promise<ReadableStream | null>
   get(key: Key, options?: KVNamespaceGetOptions<"text">): Promise<string | null>
   get<ExpectedValue = unknown>(
     key: Key,
-    options?: KVNamespaceGetOptions<"json">
+    options?: KVNamespaceGetOptions<"json">,
   ): Promise<ExpectedValue | null>
   get(
     key: Key,
-    options?: KVNamespaceGetOptions<"arrayBuffer">
+    options?: KVNamespaceGetOptions<"arrayBuffer">,
   ): Promise<ArrayBuffer | null>
   get(
     key: Key,
-    options?: KVNamespaceGetOptions<"stream">
+    options?: KVNamespaceGetOptions<"stream">,
   ): Promise<ReadableStream | null>
   get(key: Array<Key>, type: "text"): Promise<Map<string, string | null>>
   get<ExpectedValue = unknown>(
     key: Array<Key>,
-    type: "json"
+    type: "json",
   ): Promise<Map<string, ExpectedValue | null>>
   get(
     key: Array<Key>,
-    options?: Partial<KVNamespaceGetOptions<undefined>>
+    options?: Partial<KVNamespaceGetOptions<undefined>>,
   ): Promise<Map<string, string | null>>
   get(
     key: Array<Key>,
-    options?: KVNamespaceGetOptions<"text">
+    options?: KVNamespaceGetOptions<"text">,
   ): Promise<Map<string, string | null>>
   get<ExpectedValue = unknown>(
     key: Array<Key>,
-    options?: KVNamespaceGetOptions<"json">
+    options?: KVNamespaceGetOptions<"json">,
   ): Promise<Map<string, ExpectedValue | null>>
   list<Metadata = unknown>(
-    options?: KVNamespaceListOptions
+    options?: KVNamespaceListOptions,
   ): Promise<KVNamespaceListResult<Metadata, Key>>
   put(
     key: Key,
     value: string | ArrayBuffer | ArrayBufferView | ReadableStream,
-    options?: KVNamespacePutOptions
+    options?: KVNamespacePutOptions,
   ): Promise<void>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    options?: Partial<KVNamespaceGetOptions<undefined>>
+    options?: Partial<KVNamespaceGetOptions<undefined>>,
   ): Promise<KVNamespaceGetWithMetadataResult<string, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    type: "text"
+    type: "text",
   ): Promise<KVNamespaceGetWithMetadataResult<string, Metadata>>
   getWithMetadata<ExpectedValue = unknown, Metadata = unknown>(
     key: Key,
-    type: "json"
+    type: "json",
   ): Promise<KVNamespaceGetWithMetadataResult<ExpectedValue, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    type: "arrayBuffer"
+    type: "arrayBuffer",
   ): Promise<KVNamespaceGetWithMetadataResult<ArrayBuffer, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    type: "stream"
+    type: "stream",
   ): Promise<KVNamespaceGetWithMetadataResult<ReadableStream, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    options: KVNamespaceGetOptions<"text">
+    options: KVNamespaceGetOptions<"text">,
   ): Promise<KVNamespaceGetWithMetadataResult<string, Metadata>>
   getWithMetadata<ExpectedValue = unknown, Metadata = unknown>(
     key: Key,
-    options: KVNamespaceGetOptions<"json">
+    options: KVNamespaceGetOptions<"json">,
   ): Promise<KVNamespaceGetWithMetadataResult<ExpectedValue, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    options: KVNamespaceGetOptions<"arrayBuffer">
+    options: KVNamespaceGetOptions<"arrayBuffer">,
   ): Promise<KVNamespaceGetWithMetadataResult<ArrayBuffer, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Key,
-    options: KVNamespaceGetOptions<"stream">
+    options: KVNamespaceGetOptions<"stream">,
   ): Promise<KVNamespaceGetWithMetadataResult<ReadableStream, Metadata>>
   getWithMetadata<Metadata = unknown>(
     key: Array<Key>,
-    type: "text"
+    type: "text",
   ): Promise<Map<string, KVNamespaceGetWithMetadataResult<string, Metadata>>>
   getWithMetadata<ExpectedValue = unknown, Metadata = unknown>(
     key: Array<Key>,
-    type: "json"
+    type: "json",
   ): Promise<
     Map<string, KVNamespaceGetWithMetadataResult<ExpectedValue, Metadata>>
   >
   getWithMetadata<Metadata = unknown>(
     key: Array<Key>,
-    options?: Partial<KVNamespaceGetOptions<undefined>>
+    options?: Partial<KVNamespaceGetOptions<undefined>>,
   ): Promise<Map<string, KVNamespaceGetWithMetadataResult<string, Metadata>>>
   getWithMetadata<Metadata = unknown>(
     key: Array<Key>,
-    options?: KVNamespaceGetOptions<"text">
+    options?: KVNamespaceGetOptions<"text">,
   ): Promise<Map<string, KVNamespaceGetWithMetadataResult<string, Metadata>>>
   getWithMetadata<ExpectedValue = unknown, Metadata = unknown>(
     key: Array<Key>,
-    options?: KVNamespaceGetOptions<"json">
+    options?: KVNamespaceGetOptions<"json">,
   ): Promise<
     Map<string, KVNamespaceGetWithMetadataResult<ExpectedValue, Metadata>>
   >
@@ -2301,7 +2301,7 @@ interface Queue<Body = unknown> {
   send(message: Body, options?: QueueSendOptions): Promise<void>
   sendBatch(
     messages: Iterable<MessageSendRequest<Body>>,
-    options?: QueueSendBatchOptions
+    options?: QueueSendBatchOptions,
   ): Promise<void>
 }
 interface QueueSendOptions {
@@ -2360,7 +2360,7 @@ declare abstract class R2Bucket {
     key: string,
     options: R2GetOptions & {
       onlyIf: R2Conditional | Headers
-    }
+    },
   ): Promise<R2ObjectBody | R2Object | null>
   get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | null>
   put(
@@ -2374,7 +2374,7 @@ declare abstract class R2Bucket {
       | Blob,
     options?: R2PutOptions & {
       onlyIf: R2Conditional | Headers
-    }
+    },
   ): Promise<R2Object | null>
   put(
     key: string,
@@ -2385,11 +2385,11 @@ declare abstract class R2Bucket {
       | string
       | null
       | Blob,
-    options?: R2PutOptions
+    options?: R2PutOptions,
   ): Promise<R2Object>
   createMultipartUpload(
     key: string,
-    options?: R2MultipartOptions
+    options?: R2MultipartOptions,
   ): Promise<R2MultipartUpload>
   resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload
   delete(keys: string | string[]): Promise<void>
@@ -2401,7 +2401,7 @@ interface R2MultipartUpload {
   uploadPart(
     partNumber: number,
     value: ReadableStream | (ArrayBuffer | ArrayBufferView) | string | Blob,
-    options?: R2UploadPartOptions
+    options?: R2UploadPartOptions,
   ): Promise<R2UploadedPart>
   abort(): Promise<void>
   complete(uploadedParts: R2UploadedPart[]): Promise<R2Object>
@@ -2533,7 +2533,7 @@ interface UnderlyingSink<W = any> {
   start?: (controller: WritableStreamDefaultController) => void | Promise<void>
   write?: (
     chunk: W,
-    controller: WritableStreamDefaultController
+    controller: WritableStreamDefaultController,
   ) => void | Promise<void>
   abort?: (reason: any) => void | Promise<void>
   close?: () => void | Promise<void>
@@ -2548,10 +2548,10 @@ interface UnderlyingByteSource {
 interface UnderlyingSource<R = any> {
   type?: "" | undefined
   start?: (
-    controller: ReadableStreamDefaultController<R>
+    controller: ReadableStreamDefaultController<R>,
   ) => void | Promise<void>
   pull?: (
-    controller: ReadableStreamDefaultController<R>
+    controller: ReadableStreamDefaultController<R>,
   ) => void | Promise<void>
   cancel?: (reason: any) => void | Promise<void>
   expectedLength?: number | bigint
@@ -2560,14 +2560,14 @@ interface Transformer<I = any, O = any> {
   readableType?: string
   writableType?: string
   start?: (
-    controller: TransformStreamDefaultController<O>
+    controller: TransformStreamDefaultController<O>,
   ) => void | Promise<void>
   transform?: (
     chunk: I,
-    controller: TransformStreamDefaultController<O>
+    controller: TransformStreamDefaultController<O>,
   ) => void | Promise<void>
   flush?: (
-    controller: TransformStreamDefaultController<O>
+    controller: TransformStreamDefaultController<O>,
   ) => void | Promise<void>
   cancel?: (reason: any) => void | Promise<void>
   expectedLength?: number
@@ -2641,7 +2641,7 @@ interface ReadableStream<R = any> {
    */
   pipeThrough<T>(
     transform: ReadableWritablePair<T, R>,
-    options?: StreamPipeOptions
+    options?: StreamPipeOptions,
   ): ReadableStream<T>
   /**
    * The **`pipeTo()`** method of the ReadableStream interface pipes the current `ReadableStream` to a given WritableStream and returns a Promise that fulfills when the piping process completes successfully, or rejects if any errors were encountered.
@@ -2650,7 +2650,7 @@ interface ReadableStream<R = any> {
    */
   pipeTo(
     destination: WritableStream<R>,
-    options?: StreamPipeOptions
+    options?: StreamPipeOptions,
   ): Promise<void>
   /**
    * The **`tee()`** method of the two-element array containing the two resulting branches as new ReadableStream instances.
@@ -2660,7 +2660,7 @@ interface ReadableStream<R = any> {
   tee(): [ReadableStream<R>, ReadableStream<R>]
   values(options?: ReadableStreamValuesOptions): AsyncIterableIterator<R>
   [Symbol.asyncIterator](
-    options?: ReadableStreamValuesOptions
+    options?: ReadableStreamValuesOptions,
   ): AsyncIterableIterator<R>
 }
 /**
@@ -2672,11 +2672,11 @@ declare const ReadableStream: {
   prototype: ReadableStream
   new (
     underlyingSource: UnderlyingByteSource,
-    strategy?: QueuingStrategy<Uint8Array>
+    strategy?: QueuingStrategy<Uint8Array>,
   ): ReadableStream<Uint8Array>
   new <R = any>(
     underlyingSource?: UnderlyingSource<R>,
-    strategy?: QueuingStrategy<R>
+    strategy?: QueuingStrategy<R>,
   ): ReadableStream<R>
 }
 /**
@@ -2724,7 +2724,7 @@ declare class ReadableStreamBYOBReader {
   releaseLock(): void
   readAtLeast<T extends ArrayBufferView>(
     minElements: number,
-    view: T
+    view: T,
   ): Promise<ReadableStreamReadResult<T>>
 }
 interface ReadableStreamBYOBReaderReadableStreamBYOBReaderReadOptions {
@@ -2899,7 +2899,7 @@ interface ReadableWritablePair<R = any, W = any> {
 declare class WritableStream<W = any> {
   constructor(
     underlyingSink?: UnderlyingSink,
-    queuingStrategy?: QueuingStrategy
+    queuingStrategy?: QueuingStrategy,
   )
   /**
    * The **`locked`** read-only property of the WritableStream interface returns a boolean indicating whether the `WritableStream` is locked to a writer.
@@ -2985,7 +2985,7 @@ declare class TransformStream<I = any, O = any> {
   constructor(
     transformer?: Transformer<I, O>,
     writableStrategy?: QueuingStrategy<I>,
-    readableStrategy?: QueuingStrategy<O>
+    readableStrategy?: QueuingStrategy<O>,
   )
   /**
    * The **`readable`** read-only property of the TransformStream interface returns the ReadableStream instance controlled by this `TransformStream`.
@@ -3003,7 +3003,7 @@ declare class TransformStream<I = any, O = any> {
 declare class FixedLengthStream extends IdentityTransformStream {
   constructor(
     expectedLength: number | bigint,
-    queuingStrategy?: IdentityTransformStreamQueuingStrategy
+    queuingStrategy?: IdentityTransformStreamQueuingStrategy,
   )
 }
 declare class IdentityTransformStream extends TransformStream<
@@ -3405,7 +3405,7 @@ declare class URL {
  */
 declare class URLSearchParams {
   constructor(
-    init?: Iterable<Iterable<string>> | Record<string, string> | string
+    init?: Iterable<Iterable<string>> | Record<string, string> | string,
   )
   /**
    * The **`size`** read-only property of the URLSearchParams interface indicates the total number of search parameter entries.
@@ -3466,9 +3466,9 @@ declare class URLSearchParams {
       this: This,
       value: string,
       key: string,
-      parent: URLSearchParams
+      parent: URLSearchParams,
     ) => void,
-    thisArg?: This
+    thisArg?: This,
   ): void
   /*function toString() { [native code] }*/
   toString(): string
@@ -3478,7 +3478,7 @@ declare class URLPattern {
   constructor(
     input?: string | URLPatternInit,
     baseURL?: string | URLPatternOptions,
-    patternOptions?: URLPatternOptions
+    patternOptions?: URLPatternOptions,
   )
   get protocol(): string
   get username(): string
@@ -3492,7 +3492,7 @@ declare class URLPattern {
   test(input?: string | URLPatternInit, baseURL?: string): boolean
   exec(
     input?: string | URLPatternInit,
-    baseURL?: string
+    baseURL?: string,
   ): URLPatternResult | null
 }
 interface URLPatternInit {
@@ -3642,7 +3642,7 @@ interface SqlStorage {
 declare abstract class SqlStorageStatement {}
 type SqlStorageValue = ArrayBuffer | string | number | null
 declare abstract class SqlStorageCursor<
-  T extends Record<string, SqlStorageValue>
+  T extends Record<string, SqlStorageValue>,
 > {
   next():
     | {
@@ -3808,7 +3808,7 @@ type LoopbackForExport<
   T extends
     | (new (...args: any[]) => Rpc.EntrypointBranded)
     | ExportedHandler<any, any, any>
-    | undefined = undefined
+    | undefined = undefined,
 > = T extends new (...args: any[]) => Rpc.WorkerEntrypointBranded
   ? LoopbackServiceStub<InstanceType<T>>
   : T extends new (...args: any[]) => Rpc.DurableObjectBranded
@@ -3817,13 +3817,13 @@ type LoopbackForExport<
       ? LoopbackServiceStub<undefined>
       : undefined
 type LoopbackServiceStub<
-  T extends Rpc.WorkerEntrypointBranded | undefined = undefined
+  T extends Rpc.WorkerEntrypointBranded | undefined = undefined,
 > = Fetcher<T> &
   (T extends CloudflareWorkersModule.WorkerEntrypoint<any, infer Props>
     ? (opts: { props?: Props }) => Fetcher<T>
     : (opts: { props?: any }) => Fetcher<T>)
 type LoopbackDurableObjectClass<
-  T extends Rpc.DurableObjectBranded | undefined = undefined
+  T extends Rpc.DurableObjectBranded | undefined = undefined,
 > = DurableObjectClass<T> &
   (T extends CloudflareWorkersModule.DurableObject<any, infer Props>
     ? (opts: { props?: Props }) => DurableObjectClass<T>
@@ -3845,7 +3845,7 @@ interface SyncKvListOptions {
 interface WorkerStub {
   getEntrypoint<T extends Rpc.WorkerEntrypointBranded | undefined>(
     name?: string,
-    options?: WorkerStubEntrypointOptions
+    options?: WorkerStubEntrypointOptions,
   ): Fetcher<T>
 }
 interface WorkerStubEntrypointOptions {
@@ -3854,7 +3854,7 @@ interface WorkerStubEntrypointOptions {
 interface WorkerLoader {
   get(
     name: string | null,
-    getCode: () => WorkerLoaderWorkerCode | Promise<WorkerLoaderWorkerCode>
+    getCode: () => WorkerLoaderWorkerCode | Promise<WorkerLoaderWorkerCode>,
   ): WorkerStub
 }
 interface WorkerLoaderModule {
@@ -4040,7 +4040,7 @@ declare abstract class AiSearchInstanceService {
    * @returns Response object (if streaming) or chat completion result
    */
   chatCompletions(
-    params: AiSearchChatCompletionsRequest
+    params: AiSearchChatCompletionsRequest,
   ): Promise<Response | object>
   /**
    * Delete this AI Search instance.
@@ -9609,11 +9609,11 @@ declare abstract class Ai<AiModelList extends AiModelListType = AiModels> {
   run<
     Name extends keyof AiModelList,
     Options extends AiOptions,
-    InputOptions extends AiModelList[Name]["inputs"]
+    InputOptions extends AiModelList[Name]["inputs"],
   >(
     model: Name,
     inputs: InputOptions,
-    options?: Options
+    options?: Options,
   ): Promise<
     Options extends
       | {
@@ -9633,11 +9633,11 @@ declare abstract class Ai<AiModelList extends AiModelListType = AiModels> {
   toMarkdown(): ToMarkdownService
   toMarkdown(
     files: MarkdownDocument[],
-    options?: ConversionRequestOptions
+    options?: ConversionRequestOptions,
   ): Promise<ConversionResponse[]>
   toMarkdown(
     files: MarkdownDocument,
-    options?: ConversionRequestOptions
+    options?: ConversionRequestOptions,
   ): Promise<ConversionResponse>
 }
 type GatewayRetries = {
@@ -9757,7 +9757,7 @@ declare abstract class AiGateway {
     options?: {
       gateway?: UniversalGatewayOptions
       extraHeaders?: object
-    }
+    },
   ): Promise<Response>
   getUrl(provider?: AIGatewayProviders | string): Promise<string> // eslint-disable-line
 }
@@ -9900,7 +9900,7 @@ declare abstract class AutoRAG {
    * @see AiSearchInstanceService.chatCompletions
    */
   aiSearch(
-    params: AutoRagAiSearchRequest
+    params: AutoRagAiSearchRequest,
   ): Promise<AutoRagAiSearchResponse | Response>
 }
 interface BasicImageTransformations {
@@ -10992,7 +10992,7 @@ declare abstract class D1Database {
    * @param constraintOrBookmark Either the session constraint or the explicit bookmark to anchor the created session.
    */
   withSession(
-    constraintOrBookmark?: D1SessionBookmark | D1SessionConstraint
+    constraintOrBookmark?: D1SessionBookmark | D1SessionConstraint,
   ): D1DatabaseSession
   /**
    * @deprecated dump() will be removed soon, only applies to deprecated alpha v1 databases.
@@ -11129,7 +11129,7 @@ declare abstract class EmailEvent extends ExtendableEvent {
 declare type EmailExportedHandler<Env = unknown> = (
   message: ForwardableEmailMessage,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => void | Promise<void>
 declare module "cloudflare:email" {
   let _EmailMessage: {
@@ -11351,7 +11351,7 @@ interface HostedImagesBinding {
    */
   upload(
     image: ReadableStream<Uint8Array> | ArrayBuffer,
-    options?: ImageUploadOptions
+    options?: ImageUploadOptions,
   ): Promise<ImageMetadata>
   /**
    * Update hosted image metadata
@@ -11383,7 +11383,7 @@ interface ImagesBinding {
    */
   info(
     stream: ReadableStream<Uint8Array>,
-    options?: ImageInputOptions
+    options?: ImageInputOptions,
   ): Promise<ImageInfoResponse>
   /**
    * Begin applying a series of transformations to an image
@@ -11392,7 +11392,7 @@ interface ImagesBinding {
    */
   input(
     stream: ReadableStream<Uint8Array>,
-    options?: ImageInputOptions
+    options?: ImageInputOptions,
   ): ImageTransformer
   /**
    * Access hosted images CRUD operations
@@ -11414,7 +11414,7 @@ interface ImageTransformer {
    */
   draw(
     image: ReadableStream<Uint8Array> | ImageTransformer,
-    options?: ImageDrawOptions
+    options?: ImageDrawOptions,
   ): ImageTransformer
   /**
    * Retrieve the image that results from applying the transforms to the
@@ -11468,7 +11468,7 @@ interface MediaTransformer {
    * @returns A generator for producing the transformed media output
    */
   transform(
-    transform?: MediaTransformationInputOptions
+    transform?: MediaTransformationInputOptions,
   ): MediaTransformationGenerator
   /**
    * Generates the final media output with specified options.
@@ -11588,7 +11588,7 @@ type EventContext<Env, P extends string, Data> = {
 type PagesFunction<
   Env = unknown,
   Params extends string = any,
-  Data extends Record<string, unknown> = Record<string, unknown>
+  Data extends Record<string, unknown> = Record<string, unknown>,
 > = (context: EventContext<Env, Params, Data>) => Response | Promise<Response>
 type EventPluginContext<Env, P extends string, Data, PluginArgs> = {
   request: Request<unknown, IncomingRequestCfProperties<unknown>>
@@ -11609,9 +11609,9 @@ type PagesPluginFunction<
   Env = unknown,
   Params extends string = any,
   Data extends Record<string, unknown> = Record<string, unknown>,
-  PluginArgs = unknown
+  PluginArgs = unknown,
 > = (
-  context: EventPluginContext<Env, Params, Data, PluginArgs>
+  context: EventPluginContext<Env, Params, Data, PluginArgs>,
 ) => Response | Promise<Response>
 declare module "assets:*" {
   export const onRequest: PagesFunction
@@ -11623,7 +11623,7 @@ declare module "cloudflare:pipelines" {
   export abstract class PipelineTransformationEntrypoint<
     Env = unknown,
     I extends PipelineRecord = PipelineRecord,
-    O extends PipelineRecord = PipelineRecord
+    O extends PipelineRecord = PipelineRecord,
   > {
     protected env: Env
     protected ctx: ExecutionContext
@@ -11828,7 +11828,7 @@ declare namespace Rpc {
   // `Reserved` names (e.g. stub method names like `dup()`) and symbols can't be accessed over RPC.
   export type Provider<
     T extends object,
-    Reserved extends string = never
+    Reserved extends string = never,
   > = MaybeCallableProvider<T> &
     Pick<
       {
@@ -11908,7 +11908,7 @@ declare namespace CloudflareWorkersModule {
     scheduled?(controller: ScheduledController): void | Promise<void>
     tail?(events: TraceItem[]): void | Promise<void>
     tailStream?(
-      event: TailStream.TailEvent<TailStream.Onset>
+      event: TailStream.TailEvent<TailStream.Onset>,
     ):
       | TailStream.TailEventHandlerType
       | Promise<TailStream.TailEventHandlerType>
@@ -11926,13 +11926,13 @@ declare namespace CloudflareWorkersModule {
     fetch?(request: Request): Response | Promise<Response>
     webSocketMessage?(
       ws: WebSocket,
-      message: string | ArrayBuffer
+      message: string | ArrayBuffer,
     ): void | Promise<void>
     webSocketClose?(
       ws: WebSocket,
       code: number,
       reason: string,
-      wasClean: boolean
+      wasClean: boolean,
     ): void | Promise<void>
     webSocketError?(ws: WebSocket, error: unknown): void | Promise<void>
   }
@@ -11972,12 +11972,12 @@ declare namespace CloudflareWorkersModule {
   export abstract class WorkflowStep {
     do<T extends Rpc.Serializable<T>>(
       name: string,
-      callback: () => Promise<T>
+      callback: () => Promise<T>,
     ): Promise<T>
     do<T extends Rpc.Serializable<T>>(
       name: string,
       config: WorkflowStepConfig,
-      callback: () => Promise<T>
+      callback: () => Promise<T>,
     ): Promise<T>
     sleep: (name: string, duration: WorkflowSleepDuration) => Promise<void>
     sleepUntil: (name: string, timestamp: Date | number) => Promise<void>
@@ -11986,7 +11986,7 @@ declare namespace CloudflareWorkersModule {
       options: {
         type: string
         timeout?: WorkflowTimeoutDuration | number
-      }
+      },
     ): Promise<WorkflowStepEvent<T>>
   }
   export type WorkflowInstanceStatus =
@@ -12001,7 +12001,7 @@ declare namespace CloudflareWorkersModule {
     | "unknown"
   export abstract class WorkflowEntrypoint<
     Env = unknown,
-    T extends Rpc.Serializable<T> | unknown = unknown
+    T extends Rpc.Serializable<T> | unknown = unknown,
   >
     implements Rpc.WorkflowEntrypointBranded
   {
@@ -12017,7 +12017,7 @@ declare namespace CloudflareWorkersModule {
   export function withEnvAndExports(
     newEnv: unknown,
     newExports: unknown,
-    fn: () => unknown
+    fn: () => unknown,
   ): unknown
   export const env: Cloudflare.Env
   export const exports: Cloudflare.Exports
@@ -12035,7 +12035,7 @@ interface SecretsStoreSecret {
 declare module "cloudflare:sockets" {
   function _connect(
     address: string | SocketAddress,
-    options?: SocketOptions
+    options?: SocketOptions,
   ): Socket
   export { _connect as connect }
 }
@@ -12094,11 +12094,11 @@ type SupportedFileFormat = {
 declare abstract class ToMarkdownService {
   transform(
     files: MarkdownDocument[],
-    options?: ConversionRequestOptions
+    options?: ConversionRequestOptions,
   ): Promise<ConversionResponse[]>
   transform(
     files: MarkdownDocument,
-    options?: ConversionRequestOptions
+    options?: ConversionRequestOptions,
   ): Promise<ConversionResponse>
   supported(): Promise<SupportedFileFormat[]>
 }
@@ -12309,7 +12309,7 @@ declare namespace TailStream {
     readonly event: Event
   }
   type TailEventHandler<Event extends EventType = EventType> = (
-    event: TailEvent<Event>
+    event: TailEvent<Event>,
   ) => void | Promise<void>
   type TailEventHandlerObject = {
     outcome?: TailEventHandler<Outcome>
@@ -12507,7 +12507,7 @@ declare abstract class VectorizeIndex {
    */
   public query(
     vector: VectorFloatArray | number[],
-    options?: VectorizeQueryOptions
+    options?: VectorizeQueryOptions,
   ): Promise<VectorizeMatches>
   /**
    * Insert a list of vectors into the index dataset. If a provided id exists, an error will be thrown.
@@ -12553,7 +12553,7 @@ declare abstract class Vectorize {
    */
   public query(
     vector: VectorFloatArray | number[],
-    options?: VectorizeQueryOptions
+    options?: VectorizeQueryOptions,
   ): Promise<VectorizeMatches>
   /**
    * Use the provided vector-id to perform a similarity search across the index.
@@ -12563,7 +12563,7 @@ declare abstract class Vectorize {
    */
   public queryById(
     vectorId: string,
-    options?: VectorizeQueryOptions
+    options?: VectorizeQueryOptions,
   ): Promise<VectorizeMatches>
   /**
    * Insert a list of vectors into the index dataset. If a provided id exists, an error will be thrown.
@@ -12637,7 +12637,7 @@ interface DispatchNamespace {
     args?: {
       [key: string]: any
     },
-    options?: DynamicDispatchOptions
+    options?: DynamicDispatchOptions,
   ): Fetcher
 }
 declare module "cloudflare:workflows" {
@@ -12662,7 +12662,7 @@ declare abstract class Workflow<PARAMS = unknown> {
    * @returns A promise that resolves with a handle for the Instance
    */
   public create(
-    options?: WorkflowInstanceCreateOptions<PARAMS>
+    options?: WorkflowInstanceCreateOptions<PARAMS>,
   ): Promise<WorkflowInstance>
   /**
    * Create a batch of instances and return handle for all of them. If a provided id exists, an error will be thrown.
@@ -12671,7 +12671,7 @@ declare abstract class Workflow<PARAMS = unknown> {
    * @returns A promise that resolves with a list of handles for the created instances.
    */
   public createBatch(
-    batch: WorkflowInstanceCreateOptions<PARAMS>[]
+    batch: WorkflowInstanceCreateOptions<PARAMS>[],
   ): Promise<WorkflowInstance[]>
 }
 type WorkflowDurationLabel =
@@ -12752,7 +12752,7 @@ declare abstract class WorkflowInstance {
    */
   public sendEvent({
     type,
-    payload
+    payload,
   }: {
     type: string
     payload: unknown

@@ -6,8 +6,8 @@ const config: Config = {
   plugins: [
     "prettier-package-json",
     "prettier-plugin-tailwindcss",
-    "@ianvs/prettier-plugin-sort-imports"
-  ]
+    "@ianvs/prettier-plugin-sort-imports",
+  ],
 }
 
 export default config
