@@ -1,0 +1,43 @@
+export const metadata = {
+  title: "Installation",
+}
+
+# Installation
+
+## Requirements
+
+- A Linux-based operating system
+- `git` installed on your system
+- `bash` or `zsh` shell
+
+## Install via curl
+
+```bash
+curl -fsSL https://easyrice.sh/install | bash
+```
+
+## Install via package manager
+
+### Arch Linux (AUR)
+
+```bash
+yay -S easyrice
+```
+
+### Nix
+
+```bash
+nix-env -iA nixpkgs.easyrice
+```
+
+## Verify Installation
+
+After installing, verify that easyrice is available:
+
+```bash
+easyrice --version
+```
+
+## Next Steps
+
+Once installed, check out the [Commands](/docs/commands) reference to see what you can do.

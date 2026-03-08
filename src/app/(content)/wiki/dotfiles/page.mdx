@@ -1,0 +1,54 @@
+export const metadata = {
+  title: "Dotfiles",
+}
+
+# Dotfiles
+
+Dotfiles are configuration files in your home directory (typically prefixed with a `.`, hence the name) that control the behavior and appearance of your applications. Managing them properly is essential for a reproducible rice.
+
+## Common Dotfiles
+
+| File / Directory                     | Purpose                             |
+| ------------------------------------ | ----------------------------------- |
+| `~/.config/i3/config`                | i3 window manager config            |
+| `~/.config/hypr/hyprland.conf`       | Hyprland config                     |
+| `~/.config/alacritty/alacritty.toml` | Alacritty terminal config           |
+| `~/.zshrc`                           | Zsh shell config                    |
+| `~/.config/waybar/`                  | Waybar status bar config and styles |
+| `~/.config/rofi/`                    | Rofi launcher theme and config      |
+
+## Managing Dotfiles with Git
+
+The most common approach is to track your dotfiles in a Git repository:
+
+### Bare Repository Method
+
+```bash
+git init --bare $HOME/.dotfiles
+alias dotfiles='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
+dotfiles config --local status.showUntrackedFiles no
+```
+
+Then add files with:
+
+```bash
+dotfiles add ~/.config/i3/config
+dotfiles commit -m "add i3 config"
+dotfiles push
+```
+
+### Symlink Method
+
+Keep your dotfiles in a dedicated directory and symlink them to their expected locations:
+
+```bash
+mkdir ~/dotfiles
+mv ~/.config/i3 ~/dotfiles/i3
+ln -s ~/dotfiles/i3 ~/.config/i3
+```
+
+Tools like **GNU Stow** can automate the symlinking process.
+
+## Using easyrice
+
+easyrice simplifies dotfile management by handling backups and application automatically. See the [CLI Reference](/docs) for details.

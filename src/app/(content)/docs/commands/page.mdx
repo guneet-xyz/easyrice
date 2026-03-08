@@ -1,0 +1,61 @@
+export const metadata = {
+  title: "Commands",
+}
+
+# Commands
+
+Full reference for all easyrice CLI commands.
+
+## `easyrice init`
+
+Initialize easyrice in your home directory. This creates the `~/.config/easyrice` directory and sets up the default configuration.
+
+```bash
+easyrice init
+```
+
+## `easyrice apply`
+
+Apply a rice configuration to your system.
+
+```bash
+easyrice apply <rice-name>
+```
+
+| Option      | Description                                |
+| ----------- | ------------------------------------------ |
+| `--dry-run` | Preview changes without applying           |
+| `--backup`  | Back up existing configs before applying   |
+| `--force`   | Overwrite existing files without prompting |
+
+## `easyrice list`
+
+List available rice configurations.
+
+```bash
+easyrice list
+```
+
+## `easyrice search`
+
+Search for rices by name, author, or tags.
+
+```bash
+easyrice search <query>
+```
+
+## `easyrice backup`
+
+Create a backup of your current desktop configuration.
+
+```bash
+easyrice backup [name]
+```
+
+## `easyrice restore`
+
+Restore a previously saved backup.
+
+```bash
+easyrice restore <backup-name>
+```

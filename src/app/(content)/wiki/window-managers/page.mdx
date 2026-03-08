@@ -1,0 +1,39 @@
+export const metadata = {
+  title: "Window Managers",
+}
+
+# Window Managers
+
+A window manager (WM) is the software responsible for controlling the placement and appearance of windows on your screen. Choosing a WM is the first and most impactful decision when creating a rice.
+
+## Tiling vs. Floating
+
+### Tiling Window Managers
+
+Tiling WMs automatically arrange windows in a non-overlapping layout. They're keyboard-driven and highly efficient for power users.
+
+- **i3** — The most popular X11 tiling WM, great documentation, easy to configure
+- **bspwm** — Binary space partitioning WM, configured via shell scripts
+- **Hyprland** — Modern Wayland compositor with smooth animations and rounded corners
+- **sway** — i3-compatible Wayland compositor, drop-in replacement for i3
+
+### Floating Window Managers
+
+Floating WMs behave more like traditional desktop environments, with overlapping windows you can drag around.
+
+- **openbox** — Lightweight and highly configurable
+- **fluxbox** — Classic floating WM with tabbing support
+
+## Which Should You Pick?
+
+| If you want...           | Try...           |
+| ------------------------ | ---------------- |
+| A great starting point   | i3 or sway       |
+| Eye candy and animations | Hyprland         |
+| Maximum minimalism       | dwm or bspwm     |
+| Wayland support          | Hyprland or sway |
+| Familiar feel            | openbox          |
+
+## Next Steps
+
+Once you've chosen a WM, you'll want to set up your [Dotfiles](/wiki/dotfiles) to manage and version your configuration.
