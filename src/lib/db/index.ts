@@ -9,7 +9,6 @@ const authHeader = `Bearer ${env.DRIZZLE_PROXY_TOKEN}`
 export const db = drizzle(
   async (sql, params, method) => {
     try {
-      // I have no idea why this doesn't work with fetch()
       const rows: { data: unknown[] } = await axios.post(
         endpoint,
         { sql, params, method, database: "easyrice" },

@@ -17,9 +17,9 @@ export default function Header() {
       </div>
       <div className="flex items-center gap-2">
         {isPending ? null : session ? (
-          <span className="text-sm font-medium px-3 py-2">
-            {session.user.name}
-          </span>
+          <Button variant="ghost" asChild>
+            <Link href="/profile">{session.user.username}</Link>
+          </Button>
         ) : (
           <Button variant="ghost" asChild>
             <Link href="/signin">Sign In</Link>
