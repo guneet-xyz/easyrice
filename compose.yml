@@ -27,7 +27,7 @@ services:
         condition: service_started
   website:
     build:
-      context: .
+      context: ./apps/website
       dockerfile: .
     container_name: easyshell-dev-website
     environment:

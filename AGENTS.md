@@ -1,13 +1,26 @@
 # Agent Instructions
 
+## Repository Structure
+
+This is an npm workspaces monorepo. The website lives in `apps/website/`.
+
+```
+├── apps/
+│   └── website/          # Next.js app (Cloudflare Workers via OpenNext)
+├── compose.yml           # Docker Compose for local dev services
+├── prettier.config.ts    # Shared Prettier config (root-level)
+├── AGENTS.md
+└── README.md
+```
+
 ## Build, Lint & Format Commands
 
 ```bash
-npm run dev              # Start Next.js dev server
-npm run build            # Production build (Next.js + OpenNext for Cloudflare)
-npm run format:write     # Format all files with Prettier
-npm run format:check     # Check formatting without writing
-npm run lint             # ESLint (flat config, no args needed)
+npm run dev -w @easyrice/website     # Start Next.js dev server
+npm run build -w @easyrice/website   # Production build (Next.js + OpenNext for Cloudflare)
+npm run format:write                 # Format all files with Prettier (root)
+npm run format:check                 # Check formatting (root)
+npm run lint -w @easyrice/website    # ESLint
 ```
 
 There is no test runner configured in this project.
@@ -15,7 +28,7 @@ There is no test runner configured in this project.
 After every file change, run these commands and fix any issues before continuing:
 
 ```bash
-npm run format:write && npm run lint
+npm run format:write && npm run lint -w @easyrice/website
 ```
 
 ## Code Style
