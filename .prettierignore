@@ -1,0 +1,7 @@
+**/node_modules
+**/.next
+**/.wrangler
+
+apps/website/next-env.d.ts
+apps/website/public/search-index.json
+
