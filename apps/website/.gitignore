@@ -1,0 +1,51 @@
+# dependencies
+node_modules
+
+# env files
+.env*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+_data
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# next.js
+.next/
+out/
+
+# production
+build
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# OpenNext
+.open-next
+
+# cloudflare
+.wrangler
+.dev.vars*
+!.dev.vars.example
+
+# generated at build time
+public/search-index.json
+
+# yarn (unused, but standard)
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# vercel
+.vercel
