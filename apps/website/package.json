@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:infisical": "infisical run --env=dev -- npm run dev",
     "dev": "tsx scripts/build-search-index.ts && next dev",
     "build": "tsx scripts/build-search-index.ts && next build",
     "build:search": "tsx scripts/build-search-index.ts",
