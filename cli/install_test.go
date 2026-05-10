@@ -1,0 +1,242 @@
+package main
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/guneet-xyz/easyrice/internal/state"
+)
+
+func setupFolderTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
+	t.Helper()
+	root := t.TempDir()
+	repoRoot = filepath.Join(root, "repo")
+	homeDir = filepath.Join(root, "home")
+	statePath = filepath.Join(root, "state.json")
+
+	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+
+	pkgDir := filepath.Join(repoRoot, "folderpkg")
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "cfg"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(pkgDir, "cfg", "init.conf"),
+		[]byte("k=v\n"), 0o644))
+
+	manifest := `schema_version = 1
+name = "folderpkg"
+description = "Folder-mode test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[profiles.common]
+sources = [{path = "cfg", mode = "folder", target = "$HOME/.config/folderpkg"}]
+
+[profiles.filemode]
+sources = [{path = "cfg", mode = "file", target = "$HOME"}]
+`
+	require.NoError(t, os.WriteFile(
+		filepath.Join(pkgDir, "rice.toml"), []byte(manifest), 0o644))
+
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	return
+}
+
+func resetInstallFlags() {
+	flagProfile = ""
+	flagYes = false
+	flagRepo = "."
+	flagState = state.DefaultPath()
+	flagLogLevel = ""
+}
+
+func setupTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
+	t.Helper()
+	root := t.TempDir()
+	repoRoot = filepath.Join(root, "repo")
+	homeDir = filepath.Join(root, "home")
+	statePath = filepath.Join(root, "state.json")
+
+	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+
+	pkgDir := filepath.Join(repoRoot, "mypkg")
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "common", ".config", "mypkg"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "macbook", ".config", "mypkg"), 0o755))
+
+	manifest := `schema_version = 1
+name = "mypkg"
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME"}]
+
+[profiles.macbook]
+sources = [
+  {path = "common", mode = "file", target = "$HOME"},
+  {path = "macbook", mode = "file", target = "$HOME"},
+]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "rice.toml"), []byte(manifest), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "common", ".config", "mypkg", "base.toml"), []byte("base=true\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "macbook", ".config", "mypkg", "machine.toml"), []byte("machine=true\n"), 0o644))
+
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	return
+}
+
+func runInstallCmd(t *testing.T, stdin string, args ...string) (string, error) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(strings.NewReader(stdin))
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	// Restore I/O so leaked writers don't affect later tests.
+	rootCmd.SetIn(os.Stdin)
+	rootCmd.SetOut(os.Stdout)
+	rootCmd.SetErr(os.Stderr)
+	return buf.String(), err
+}
+
+func TestInstall_WithYesFlag(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Plan: install mypkg")
+	assert.Contains(t, out, "CREATE")
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	fi, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "expected symlink at %s", link)
+}
+
+func TestInstall_StdinYesProceeds(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "y\n",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Plan: install mypkg")
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	_, err = os.Lstat(link)
+	require.NoError(t, err, "symlink should exist")
+}
+
+func TestInstall_StdinNoAborts(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "n\n",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Aborted.")
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	_, err = os.Lstat(link)
+	assert.True(t, os.IsNotExist(err), "symlink should NOT exist; lstat err=%v", err)
+}
+
+func TestInstall_NoArgsErrors(t *testing.T) {
+	resetInstallFlags()
+	_, err := runInstallCmd(t, "", "install")
+	require.Error(t, err)
+}
+
+func TestInstall_ShowsConflictDetails(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupTestRepo(t)
+
+	conflictTarget := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(conflictTarget), 0o755))
+	require.NoError(t, os.WriteFile(conflictTarget, []byte("existing\n"), 0o644))
+
+	out, err := runInstallCmd(t, "",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.Error(t, err, "expected error due to conflict")
+	assert.Contains(t, out, "CONFLICT")
+	assert.Contains(t, out, conflictTarget)
+}
+
+func TestInstall_WithProfileFlag(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "macbook",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "profile: macbook")
+
+	for _, rel := range []string{".config/mypkg/base.toml", ".config/mypkg/machine.toml"} {
+		_, err := os.Lstat(filepath.Join(homeDir, rel))
+		assert.NoError(t, err, "expected symlink %s", rel)
+	}
+}
+
+func TestInstall_FolderMode_CreatesSingleSymlink(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, homeDir := setupFolderTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--repo", repoRoot,
+		"--state", statePath,
+		"--yes",
+		"install", "folderpkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	target := filepath.Join(homeDir, ".config", "folderpkg")
+	fi, err := os.Lstat(target)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "expected symlink at %s", target)
+
+	wantSrc, err := filepath.Abs(filepath.Join(repoRoot, "folderpkg", "cfg"))
+	require.NoError(t, err)
+	got, err := os.Readlink(target)
+	require.NoError(t, err)
+	assert.Equal(t, wantSrc, got, "symlink should point to source dir")
+
+	st, err := state.Load(statePath)
+	require.NoError(t, err)
+	pkg, ok := st["folderpkg"]
+	require.True(t, ok, "folderpkg missing from state")
+	require.Len(t, pkg.InstalledLinks, 1)
+	assert.True(t, pkg.InstalledLinks[0].IsDir, "InstalledLinks[0].IsDir should be true")
+}

@@ -1,0 +1,10 @@
+schema_version = 1
+name = "folder-overlay-pkg"
+description = "Two folder-mode sources targeting same path"
+supported_os = ["linux", "darwin", "windows"]
+
+[profiles.common]
+sources = [
+  {path = "a", mode = "folder", target = "$HOME/.config/dup"},
+  {path = "b", mode = "folder", target = "$HOME/.config/dup"},
+]

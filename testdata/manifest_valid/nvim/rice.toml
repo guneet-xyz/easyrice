@@ -1,0 +1,11 @@
+schema_version = 1
+name = "nvim"
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+profile_key = "os"
+
+[profiles.linux]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/nvim"}, {path = "linux", mode = "file", target = "$HOME/.config/nvim"}]
+
+[profiles.darwin]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/nvim"}, {path = "darwin", mode = "file", target = "$HOME/.config/nvim"}]

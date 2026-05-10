@@ -1,0 +1,20 @@
+# Compiled binary
+/easyrice
+
+# Go build artifacts
+*.test
+*.out
+vendor/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI planning state
+.sisyphus/
