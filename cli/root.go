@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"go.uber.org/zap"
+
 	"github.com/guneet-xyz/easyrice/internal/logger"
 	"github.com/guneet-xyz/easyrice/internal/state"
+	"github.com/guneet-xyz/easyrice/internal/updater"
 	"github.com/spf13/cobra"
 )
 
@@ -39,6 +42,12 @@ var rootCmd = &cobra.Command{
 		}
 		if err := logger.Init(lvl, logger.DefaultLogPath()); err != nil {
 			return err
+		}
+		// Cleanup orphan artifacts (best-effort, never block command execution)
+		if exe, err := os.Executable(); err == nil {
+			if cleanupErr := updater.CleanupOrphanArtifacts(exe); cleanupErr != nil {
+				logger.L.Debug("orphan cleanup failed", zap.Error(cleanupErr))
+			}
 		}
 		// Set updateCheckDisabled from flag or env var (strict: only "1")
 		updateCheckDisabled = flagNoUpdateCheck || os.Getenv("EASYRICE_NO_UPDATE_CHECK") == "1"
