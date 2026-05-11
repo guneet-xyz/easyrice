@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -164,4 +165,67 @@ func Confirm(in io.Reader, out io.Writer, message string) (bool, error) {
 	line = strings.ToLower(line)
 
 	return line == "y" || line == "yes", nil
+}
+
+// SelectOption is one choice in a Select prompt.
+type SelectOption struct {
+	Label       string
+	Description string // shown as secondary info; may be empty
+}
+
+// Select writes a numbered menu to out, reads a 1-based choice from in.
+// Returns the 0-based index of the chosen option.
+// On empty input, returns defaultIdx.
+// Re-prompts up to 3 times on out-of-range input; returns error after 3 failures.
+// Returns error on EOF when autoAccept is false.
+// Signature mirrors Confirm(in io.Reader, out io.Writer, ...) exactly.
+func Select(in io.Reader, out io.Writer, label string, options []SelectOption, defaultIdx int) (int, error) {
+	return SelectWithDefault(in, out, label, options, defaultIdx, false)
+}
+
+// SelectWithDefault is like Select but when autoAccept is true, returns defaultIdx
+// immediately without reading from in (in may be nil).
+func SelectWithDefault(in io.Reader, out io.Writer, label string, options []SelectOption, defaultIdx int, autoAccept bool) (int, error) {
+	if autoAccept {
+		// Print "Using: <label>" so user knows what's running
+		if defaultIdx >= 0 && defaultIdx < len(options) {
+			fmt.Fprintf(out, "Using: %s\n", options[defaultIdx].Label)
+		}
+		return defaultIdx, nil
+	}
+
+	// Print menu
+	fmt.Fprintf(out, "%s\n", label)
+	for i, opt := range options {
+		if opt.Description != "" {
+			fmt.Fprintf(out, "  %d) %s — %s\n", i+1, opt.Label, opt.Description)
+		} else {
+			fmt.Fprintf(out, "  %d) %s\n", i+1, opt.Label)
+		}
+	}
+	fmt.Fprintf(out, "Enter choice [default: %d]: ", defaultIdx+1)
+
+	reader := bufio.NewReader(in)
+	const maxRetries = 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			return 0, fmt.Errorf("prompt: EOF before selection")
+		}
+		if err != nil {
+			return 0, err
+		}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return defaultIdx, nil
+		}
+		n, parseErr := strconv.Atoi(line)
+		if parseErr == nil && n >= 1 && n <= len(options) {
+			return n - 1, nil
+		}
+		if attempt < maxRetries-1 {
+			fmt.Fprintf(out, "Invalid choice %q. Enter 1-%d [default: %d]: ", line, len(options), defaultIdx+1)
+		}
+	}
+	return 0, fmt.Errorf("prompt: too many invalid inputs")
 }

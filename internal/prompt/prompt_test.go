@@ -441,3 +441,128 @@ func TestRenderConflicts_MixedConflicts(t *testing.T) {
 	assert.NotContains(t, output, "already exists (directory)")
 	assert.Contains(t, output, "CONFLICT  /home/user/.config/dir: is a directory (directory)")
 }
+
+func TestSelect_ValidChoice(t *testing.T) {
+	in := strings.NewReader("1\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A", Description: "First option"},
+		{Label: "Option B", Description: "Second option"},
+	}
+
+	idx, err := Select(in, &out, "Choose one", options, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, idx)
+	assert.Contains(t, out.String(), "Choose one")
+	assert.Contains(t, out.String(), "1) Option A — First option")
+	assert.Contains(t, out.String(), "2) Option B — Second option")
+}
+
+func TestSelect_EmptyInputUsesDefault(t *testing.T) {
+	in := strings.NewReader("\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+		{Label: "Option C"},
+	}
+
+	idx, err := Select(in, &out, "Choose", options, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, idx)
+}
+
+func TestSelect_OutOfRangeThenValid(t *testing.T) {
+	in := strings.NewReader("9\n1\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := Select(in, &out, "Choose", options, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, idx)
+	assert.Contains(t, out.String(), "Invalid choice")
+}
+
+func TestSelect_ThreeInvalidInputsReturnsError(t *testing.T) {
+	in := strings.NewReader("9\n10\n11\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := Select(in, &out, "Choose", options, 0)
+	assert.Error(t, err)
+	assert.Equal(t, 0, idx)
+	assert.Contains(t, err.Error(), "too many invalid inputs")
+}
+
+func TestSelect_EOFReturnsError(t *testing.T) {
+	in := strings.NewReader("")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+	}
+
+	_, err := Select(in, &out, "Choose", options, 0)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "EOF before selection")
+}
+
+func TestSelect_NoDescription(t *testing.T) {
+	in := strings.NewReader("1\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := Select(in, &out, "Choose", options, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, idx)
+	assert.Contains(t, out.String(), "1) Option A\n")
+	assert.NotContains(t, out.String(), "—")
+}
+
+func TestSelectWithDefault_AutoAcceptTrue(t *testing.T) {
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+		{Label: "Option C"},
+	}
+
+	idx, err := SelectWithDefault(nil, &out, "Choose", options, 1, true)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, idx)
+	assert.Contains(t, out.String(), "Using: Option B")
+}
+
+func TestSelectWithDefault_AutoAcceptFalse(t *testing.T) {
+	in := strings.NewReader("2\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := SelectWithDefault(in, &out, "Choose", options, 0, false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, idx)
+	assert.NotContains(t, out.String(), "Using:")
+}
+
+func TestSelect_APISignature(t *testing.T) {
+	var _ func(io.Reader, io.Writer, string, []SelectOption, int) (int, error) = Select
+}
