@@ -14,16 +14,18 @@ help:
 	@echo "  make help     - Show this message"
 
 # GOPATH configuration with fallback
-GOPATH ?= $(shell go env GOPATH)
-GOBIN  := $(GOPATH)/bin
+GOPATH   ?= $(shell go env GOPATH)
+GOBIN    := $(GOPATH)/bin
+VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS  := -s -w -X main.Version=$(VERSION)
 
 # Build local binary
 build:
-	go build -o easyrice ./cli
+	go build -trimpath -ldflags '$(LDFLAGS)' -o easyrice ./cli
 
 # Install binary to GOPATH/bin and create symlink
 install: build
-	go build -o $(GOBIN)/easyrice ./cli
+	go build -trimpath -ldflags '$(LDFLAGS)' -o $(GOBIN)/easyrice ./cli
 	ln -sf $(GOBIN)/easyrice $(GOBIN)/rice
 
 # Run tests with race detector
