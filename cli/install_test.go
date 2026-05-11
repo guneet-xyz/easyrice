@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
 )
@@ -411,4 +413,136 @@ func TestInstall_MalformedManifestErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "load manifest",
 		"error must be wrapped with 'load manifest'; got: %v", err)
+}
+
+func withMockDepsRunner(t *testing.T, m *deps.MockRunner) {
+	t.Helper()
+	prev := DepsRunner
+	DepsRunner = m
+	t.Cleanup(func() { DepsRunner = prev })
+}
+
+func setupDepsTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
+	t.Helper()
+	homeDir = setIsolatedHome(t)
+	repoRoot = repo.DefaultRepoPath()
+	statePath = filepath.Join(t.TempDir(), "state.json")
+
+	pkgDir := filepath.Join(repoRoot, "mypkg")
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "common", ".config", "mypkg"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(pkgDir, "common", ".config", "mypkg", "base.toml"),
+		[]byte("base=true\n"), 0o644))
+
+	manifest := `schema_version = 1
+
+[packages.mypkg]
+description = "Pkg with deps"
+supported_os = ["linux", "darwin", "windows"]
+dependencies = [{name = "neovim"}]
+
+[packages.mypkg.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
+	return
+}
+
+// TestInstall_WithDeps_StatePersisted asserts that when `rice install` installs
+// a missing dependency, state.json gains BOTH installed_links AND
+// installed_dependencies entries for the package.
+func TestInstall_WithDeps_StatePersisted(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("dependency install path uses brew (no-root); skipping non-darwin runners")
+	}
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	_, statePath, homeDir := setupDepsTestRepo(t)
+
+	mock := &deps.MockRunner{
+		Expectations: []deps.MockExpectation{
+			{
+				Argv:   []string{"nvim", "--version"},
+				Result: deps.RunResult{ExitCode: 1, Combined: []byte("")},
+			},
+			{
+				Argv:   []string{"brew", "install", "neovim"},
+				Result: deps.RunResult{ExitCode: 0},
+			},
+			{
+				Argv:   []string{"nvim", "--version"},
+				Result: deps.RunResult{ExitCode: 0, Combined: []byte("NVIM v0.10.0\n")},
+			},
+		},
+	}
+	withMockDepsRunner(t, mock)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	fi, err := os.Lstat(link)
+	require.NoError(t, err, "symlink should exist after install")
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "expected symlink at %s", link)
+
+	data, err := os.ReadFile(statePath)
+	require.NoError(t, err, "state.json must be created")
+
+	var s state.State
+	require.NoError(t, json.Unmarshal(data, &s))
+
+	pkgState, ok := s["mypkg"]
+	require.True(t, ok, "state must contain mypkg entry; got: %s", string(data))
+
+	assert.NotEmpty(t, pkgState.InstalledLinks, "InstalledLinks must be populated; got: %s", string(data))
+	require.Len(t, pkgState.InstalledDependencies, 1, "InstalledDependencies must record the installed dep; got: %s", string(data))
+	assert.Equal(t, "neovim", pkgState.InstalledDependencies[0].Name)
+	assert.Equal(t, "0.10.0", pkgState.InstalledDependencies[0].Version)
+	assert.Equal(t, "brew", pkgState.InstalledDependencies[0].Method)
+	assert.True(t, pkgState.InstalledDependencies[0].ManagedByEasyrice)
+}
+
+// TestInstall_EnsureDepsError asserts that when the dependency probe surfaces
+// an error, install exits non-zero, no symlinks are created, and state.json
+// is not written.
+func TestInstall_EnsureDepsError(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	_, statePath, homeDir := setupDepsTestRepo(t)
+
+	mock := &deps.MockRunner{
+		Expectations: []deps.MockExpectation{
+			{
+				Argv: []string{"nvim", "--version"},
+				Err:  errors.New("simulated probe failure"),
+			},
+		},
+	}
+	withMockDepsRunner(t, mock)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.Error(t, err, "install must fail when dep probe errors; out=%s", out)
+	assert.Contains(t, err.Error(), "ensure dependencies",
+		"error must be wrapped with 'ensure dependencies'; got: %v", err)
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	_, lstatErr := os.Lstat(link)
+	assert.True(t, os.IsNotExist(lstatErr),
+		"no symlink should exist when dep step fails; lstat err=%v", lstatErr)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr),
+		"state.json must not be created when EnsureDependencies fails; statErr=%v", statErr)
 }

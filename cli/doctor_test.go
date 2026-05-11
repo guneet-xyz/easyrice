@@ -247,3 +247,61 @@ func TestDoctor_GitMissing(t *testing.T) {
 	assert.Contains(t, out, "[ERROR]")
 	assert.Contains(t, strings.ToLower(out), "git")
 }
+
+func TestDoctor_InvalidManifest(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	repoPath := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
+
+	// Create a rice.toml with invalid TOML syntax
+	tomlPath := filepath.Join(repoPath, "rice.toml")
+	require.NoError(t, os.WriteFile(tomlPath, []byte("invalid toml [[["), 0o644))
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	// Doctor reports WARN for manifest load errors but doesn't fail
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[WARN]")
+	assert.Contains(t, out, "Cannot load manifest")
+}
+
+func TestDoctor_DeclaredDepsWarnings(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	repoPath := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
+
+	// Create a valid rice.toml with a package that has dependencies
+	tomlContent := `schema_version = 1
+
+[packages.mypkg]
+description = "Test package with deps"
+supported_os = ["linux", "darwin"]
+dependencies = [
+  {name = "missing_dep", version = "1.0.0"}
+]
+
+[packages.mypkg.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME/.config/mypkg"}]
+`
+	tomlPath := filepath.Join(repoPath, "rice.toml")
+	require.NoError(t, os.WriteFile(tomlPath, []byte(tomlContent), 0o644))
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	// Doctor should report warnings but still exit with error due to missing deps
+	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, out, "[WARN]")
+	assert.Contains(t, out, "mypkg")
+}
