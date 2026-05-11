@@ -233,3 +233,54 @@ func TestTryCreateLock_WritePidFails(t *testing.T) {
 	assert.Nil(t, f)
 	assert.True(t, os.IsExist(err))
 }
+
+func TestAcquireLock_FreshBusy(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, lockFileName)
+
+	require.NoError(t, os.WriteFile(lockPath, []byte("99999\n"), 0o644))
+	now := time.Now()
+	require.NoError(t, os.Chtimes(lockPath, now, now))
+
+	release, err := acquireLock(dir)
+	assert.Nil(t, release)
+	assert.True(t, errors.Is(err, ErrLockBusy))
+}
+
+func TestAcquireLock_StaleReclaim(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, lockFileName)
+
+	require.NoError(t, os.WriteFile(lockPath, []byte("88888\n"), 0o644))
+	old := time.Now().Add(-2 * staleLockAge)
+	require.NoError(t, os.Chtimes(lockPath, old, old))
+
+	info, err := os.Stat(lockPath)
+	require.NoError(t, err)
+	require.True(t, time.Since(info.ModTime()) > staleLockAge)
+
+	release, err := acquireLock(dir)
+	require.NoError(t, err)
+	require.NotNil(t, release)
+	defer release()
+
+	info, err = os.Stat(lockPath)
+	require.NoError(t, err)
+	assert.True(t, time.Since(info.ModTime()) < time.Minute)
+}
+
+func TestTryCreateLock_WritePidError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root; cannot test write permission failures")
+	}
+
+	dir := t.TempDir()
+	readOnlyDir := filepath.Join(dir, "readonly")
+	require.NoError(t, os.Mkdir(readOnlyDir, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o755) })
+
+	f, err := tryCreateLock(filepath.Join(readOnlyDir, lockFileName))
+	assert.Nil(t, f)
+	require.Error(t, err)
+	assert.False(t, os.IsExist(err))
+}
