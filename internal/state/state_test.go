@@ -2,8 +2,10 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -264,14 +266,16 @@ func TestRoundTripLoadAfterSave(t *testing.T) {
 }
 
 func TestDefaultPathFallback(t *testing.T) {
-	// This test verifies that DefaultPath returns a valid path even if UserConfigDir fails.
-	// We can't easily mock os.UserConfigDir, but we can verify the fallback logic by
-	// checking that the returned path contains expected components.
 	path := DefaultPath()
 	assert.NotEmpty(t, path)
 	assert.True(t, filepath.IsAbs(path), "DefaultPath should always return absolute path")
 	assert.Contains(t, path, "easyrice")
 	assert.Contains(t, path, "state.json")
+	
+	configDir, err := os.UserConfigDir()
+	if err == nil {
+		assert.True(t, strings.HasPrefix(path, configDir), "DefaultPath should use UserConfigDir when available")
+	}
 }
 
 func TestSaveErrorOnMkdirAllFailure(t *testing.T) {
@@ -279,14 +283,11 @@ func TestSaveErrorOnMkdirAllFailure(t *testing.T) {
 	readOnlyDir := filepath.Join(tmpDir, "readonly")
 	require.NoError(t, os.Mkdir(readOnlyDir, 0755))
 
-	// Make directory read-only to prevent subdirectory creation
 	require.NoError(t, os.Chmod(readOnlyDir, 0555))
 	t.Cleanup(func() {
-		// Restore permissions so TempDir cleanup can succeed
 		_ = os.Chmod(readOnlyDir, 0755)
 	})
 
-	// Try to create a file in a subdirectory of the read-only directory
 	statePath := filepath.Join(readOnlyDir, "subdir", "state.json")
 	testState := State{
 		"nvim": PackageState{
@@ -298,6 +299,62 @@ func TestSaveErrorOnMkdirAllFailure(t *testing.T) {
 
 	err := Save(statePath, testState)
 	assert.Error(t, err, "Save should error when parent directory cannot be created")
+}
+
+func TestSaveErrorOnWriteFileFailure(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping permission test in CI environment")
+	}
+
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	require.NoError(t, os.Mkdir(readOnlyDir, 0755))
+
+	require.NoError(t, os.Chmod(readOnlyDir, 0555))
+	t.Cleanup(func() {
+		_ = os.Chmod(readOnlyDir, 0755)
+	})
+
+	statePath := filepath.Join(readOnlyDir, "state.json")
+	testState := State{
+		"nvim": PackageState{
+			Profile:        "default",
+			InstalledLinks: []InstalledLink{},
+			InstalledAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	err := Save(statePath, testState)
+	assert.Error(t, err, "Save should error when unable to write file due to permissions")
+}
+
+type errorMarshaler struct{}
+
+func (e *errorMarshaler) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("marshal error")
+}
+
+func TestSaveErrorOnMarshalIndentFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	testState := State{
+		"test": PackageState{
+			Profile:        "default",
+			InstalledLinks: []InstalledLink{},
+			InstalledAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	originalState := testState
+	testState["test"] = PackageState{
+		Profile:        "default",
+		InstalledLinks: []InstalledLink{},
+		InstalledAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+	}
+
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
 }
 
 func TestLoadErrorOnReadFailure(t *testing.T) {

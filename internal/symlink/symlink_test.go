@@ -258,6 +258,66 @@ func TestReadLink_ErrorOnNonSymlink(t *testing.T) {
 	}
 }
 
+func TestRemoveSymlink_ErrorWhenRemovalFails(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping permission test in CI environment")
+	}
+
+	tmpDir := t.TempDir()
+	parentDir := filepath.Join(tmpDir, "restricted")
+
+	if err := os.Mkdir(parentDir, 0755); err != nil {
+		t.Fatalf("failed to create parent directory: %v", err)
+	}
+
+	target := filepath.Join(parentDir, "link.txt")
+	if err := os.Symlink("source.txt", target); err != nil {
+		t.Fatalf("failed to create test symlink: %v", err)
+	}
+
+	if err := os.Chmod(parentDir, 0555); err != nil {
+		t.Fatalf("failed to remove write permission: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Chmod(parentDir, 0755)
+	})
+
+	err := RemoveSymlink(target)
+	if err == nil {
+		t.Fatal("RemoveSymlink should fail when unable to remove symlink due to permissions")
+	}
+}
+
+func TestIsSymlinkTo_ErrorWhenReadlinkFails(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping permission test in CI environment")
+	}
+
+	tmpDir := t.TempDir()
+	parentDir := filepath.Join(tmpDir, "restricted")
+
+	if err := os.Mkdir(parentDir, 0755); err != nil {
+		t.Fatalf("failed to create parent directory: %v", err)
+	}
+
+	target := filepath.Join(parentDir, "link.txt")
+	if err := os.Symlink("source.txt", target); err != nil {
+		t.Fatalf("failed to create test symlink: %v", err)
+	}
+
+	if err := os.Chmod(parentDir, 0000); err != nil {
+		t.Fatalf("failed to remove permissions: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Chmod(parentDir, 0755)
+	})
+
+	_, err := IsSymlinkTo(target, "source.txt")
+	if err == nil {
+		t.Fatal("IsSymlinkTo should fail when unable to read symlink due to permissions")
+	}
+}
+
 func TestReadLink_HappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	source := "source.txt"
