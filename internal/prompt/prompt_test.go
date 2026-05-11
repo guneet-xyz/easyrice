@@ -720,3 +720,214 @@ func TestShorten(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectWithDefault_AutoAcceptWithInvalidDefaultIdx(t *testing.T) {
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := SelectWithDefault(nil, &out, "Choose", options, 2, true)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, idx)
+	assert.NotContains(t, out.String(), "Using:")
+}
+
+func TestSelectWithDefault_AutoAcceptWithNegativeDefaultIdx(t *testing.T) {
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := SelectWithDefault(nil, &out, "Choose", options, -1, true)
+	assert.NoError(t, err)
+	assert.Equal(t, -1, idx)
+	assert.NotContains(t, out.String(), "Using:")
+}
+
+func TestSelectWithDefault_EmptyOptions(t *testing.T) {
+	in := strings.NewReader("\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{}
+
+	idx, err := SelectWithDefault(in, &out, "Choose", options, 0, false)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, idx)
+}
+
+func TestSelectWithDefault_InvalidInputThenEOF(t *testing.T) {
+	in := strings.NewReader("invalid\ninvalid\ninvalid\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A"},
+		{Label: "Option B"},
+	}
+
+	idx, err := SelectWithDefault(in, &out, "Choose", options, 0, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "too many invalid inputs")
+	assert.Equal(t, 0, idx)
+}
+
+func TestRenderDepReport_UnknownStatus(t *testing.T) {
+	report := deps.DepReport{
+		Entries: []deps.DepReportEntry{
+			{
+				Dep:              deps.ResolvedDependency{Name: "unknown-status"},
+				Status:           999,
+				InstalledVersion: "1.0.0",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "Dependency check:")
+	assert.Contains(t, output, "? unknown-status (1.0.0) — unknown")
+}
+
+func TestRenderDepReport_NoVersionInfo(t *testing.T) {
+	report := deps.DepReport{
+		Entries: []deps.DepReportEntry{
+			{
+				Dep:              deps.ResolvedDependency{Name: "tool"},
+				Status:           deps.DepOK,
+				InstalledVersion: "",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "Dependency check:")
+	assert.Contains(t, output, "✓ tool — installed")
+	assert.NotContains(t, output, "()")
+}
+
+func TestRenderDepReport_VersionMismatchWithoutVersion(t *testing.T) {
+	report := deps.DepReport{
+		Entries: []deps.DepReportEntry{
+			{
+				Dep:              deps.ResolvedDependency{Name: "tool", Version: ""},
+				Status:           deps.DepVersionMismatch,
+				InstalledVersion: "1.0.0",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "Dependency check:")
+	assert.Contains(t, output, "! tool (1.0.0) — version mismatch, need ")
+}
+
+func TestSelectInstallMethod_SelectWithDefaultError(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "ripgrep"},
+		Methods: []deps.InstallMethod{
+			{ID: "apt", Description: "apt install ripgrep", Command: []string{"apt", "install", "ripgrep"}},
+		},
+	}
+
+	in := strings.NewReader("")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "EOF before selection")
+	assert.Equal(t, deps.InstallMethod{}, method)
+}
+
+func TestSelectInstallMethod_MultipleMethodsWithCommand(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "ripgrep"},
+		Methods: []deps.InstallMethod{
+			{ID: "apt", Description: "apt install ripgrep", Command: []string{"apt", "install", "ripgrep"}},
+			{ID: "brew", Description: "brew install ripgrep", Command: []string{"brew", "install", "ripgrep"}},
+			{ID: "cargo", Description: "cargo install ripgrep", Command: []string{"cargo", "install", "ripgrep"}},
+		},
+	}
+
+	in := strings.NewReader("3\n")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, false)
+	assert.NoError(t, err)
+	assert.Equal(t, "cargo", method.ID)
+	assert.Contains(t, out.String(), "Choose install method for ripgrep:")
+	assert.Contains(t, out.String(), "1) apt install ripgrep")
+	assert.Contains(t, out.String(), "2) brew install ripgrep")
+	assert.Contains(t, out.String(), "3) cargo install ripgrep")
+}
+
+func TestRenderConflicts_DirectoryConflictWithoutIsDir(t *testing.T) {
+	conflicts := []plan.Conflict{
+		{Target: "/home/user/.config/file", Reason: "already exists", IsDir: false},
+	}
+
+	var buf bytes.Buffer
+	RenderConflicts(&buf, conflicts)
+	output := buf.String()
+
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/file: already exists")
+	assert.NotContains(t, output, "(directory)")
+}
+
+func TestRenderConflicts_SingleConflict(t *testing.T) {
+	conflicts := []plan.Conflict{
+		{Target: "/home/user/.config/file", Reason: "already exists", IsDir: false},
+	}
+
+	var buf bytes.Buffer
+	RenderConflicts(&buf, conflicts)
+	output := buf.String()
+
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/file: already exists")
+}
+
+func TestRenderPlan_CreateDirOps(t *testing.T) {
+	p := &plan.Plan{
+		PackageName: "test",
+		Profile:     "default",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/dir", Target: "/home/user/.config/dir", IsDir: true},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "CREATE-DIR")
+	assert.Contains(t, output, "/home/user/.config/dir")
+	assert.Contains(t, output, "src/dir")
+}
+
+func TestRenderPlan_RemoveDirOps(t *testing.T) {
+	p := &plan.Plan{
+		PackageName: "test",
+		Ops: []plan.Op{
+			{Kind: plan.OpRemove, Target: "/home/user/.config/dir", IsDir: true},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "REMOVE-DIR")
+	assert.Contains(t, output, "/home/user/.config/dir")
+	assert.Contains(t, output, "Total: 1 symlinks to remove.")
+}
