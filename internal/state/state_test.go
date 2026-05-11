@@ -189,3 +189,130 @@ func TestLoadEmptyFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, State{}, loaded)
 }
+
+func TestSaveErrorOnUnwritablePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	require.NoError(t, os.Mkdir(readOnlyDir, 0755))
+
+	// Make directory read-only to prevent file creation
+	require.NoError(t, os.Chmod(readOnlyDir, 0555))
+	t.Cleanup(func() {
+		// Restore permissions so TempDir cleanup can succeed
+		_ = os.Chmod(readOnlyDir, 0755)
+	})
+
+	statePath := filepath.Join(readOnlyDir, "state.json")
+	testState := State{
+		"nvim": PackageState{
+			Profile:        "default",
+			InstalledLinks: []InstalledLink{},
+			InstalledAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	err := Save(statePath, testState)
+	assert.Error(t, err, "Save should error when parent directory is not writable")
+}
+
+func TestDefaultPathReturnsConfigDir(t *testing.T) {
+	path := DefaultPath()
+	assert.NotEmpty(t, path)
+	assert.Contains(t, path, "easyrice")
+	assert.Contains(t, path, "state.json")
+	assert.True(t, filepath.IsAbs(path), "DefaultPath should return absolute path")
+}
+
+func TestRoundTripLoadAfterSave(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		},
+		"ghostty": PackageState{
+			Profile: "minimal",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/ghostty/config",
+					Target: "/home/user/.config/ghostty/config",
+				},
+			},
+			InstalledAt: time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify equality
+	assert.Equal(t, originalState, loadedState)
+}
+
+func TestDefaultPathFallback(t *testing.T) {
+	// This test verifies that DefaultPath returns a valid path even if UserConfigDir fails.
+	// We can't easily mock os.UserConfigDir, but we can verify the fallback logic by
+	// checking that the returned path contains expected components.
+	path := DefaultPath()
+	assert.NotEmpty(t, path)
+	assert.True(t, filepath.IsAbs(path), "DefaultPath should always return absolute path")
+	assert.Contains(t, path, "easyrice")
+	assert.Contains(t, path, "state.json")
+}
+
+func TestSaveErrorOnMkdirAllFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	require.NoError(t, os.Mkdir(readOnlyDir, 0755))
+
+	// Make directory read-only to prevent subdirectory creation
+	require.NoError(t, os.Chmod(readOnlyDir, 0555))
+	t.Cleanup(func() {
+		// Restore permissions so TempDir cleanup can succeed
+		_ = os.Chmod(readOnlyDir, 0755)
+	})
+
+	// Try to create a file in a subdirectory of the read-only directory
+	statePath := filepath.Join(readOnlyDir, "subdir", "state.json")
+	testState := State{
+		"nvim": PackageState{
+			Profile:        "default",
+			InstalledLinks: []InstalledLink{},
+			InstalledAt:    time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	err := Save(statePath, testState)
+	assert.Error(t, err, "Save should error when parent directory cannot be created")
+}
+
+func TestLoadErrorOnReadFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Create a file
+	require.NoError(t, os.WriteFile(statePath, []byte("{}"), 0644))
+
+	// Make file unreadable
+	require.NoError(t, os.Chmod(statePath, 0000))
+	t.Cleanup(func() {
+		// Restore permissions so TempDir cleanup can succeed
+		_ = os.Chmod(statePath, 0644)
+	})
+
+	_, err := Load(statePath)
+	assert.Error(t, err, "Load should error when file cannot be read due to permissions")
+}

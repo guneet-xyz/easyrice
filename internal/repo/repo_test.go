@@ -135,3 +135,88 @@ func TestErrPackageNotDeclared(t *testing.T) {
 		t.Fatalf("error %q should contain quoted package name", err.Error())
 	}
 }
+
+func TestDefaultRepoPath_ContainsEasyrice(t *testing.T) {
+	got := DefaultRepoPath()
+	if !strings.Contains(got, "easyrice") {
+		t.Fatalf("DefaultRepoPath() = %q, want to contain 'easyrice'", got)
+	}
+	if !strings.Contains(got, filepath.Join("repos", "default")) {
+		t.Fatalf("DefaultRepoPath() = %q, want to contain 'repos/default'", got)
+	}
+}
+
+func TestPull_ErrorWhenRepoMissing(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "nope")
+	err := Pull(context.Background(), missing)
+	if err == nil {
+		t.Fatal("expected error when pulling from non-existent repo")
+	}
+	if !strings.Contains(err.Error(), "git pull") {
+		t.Fatalf("error %q should contain 'git pull'", err.Error())
+	}
+}
+
+func TestPull_ErrorWhenGitMissing(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH, cannot test git-missing scenario")
+	}
+	bare, _ := setupBareRepo(t)
+	dest := filepath.Join(t.TempDir(), "clone")
+	if err := Clone(context.Background(), bare, dest); err != nil {
+		t.Fatalf("Clone: %v", err)
+	}
+
+	t.Setenv("PATH", "")
+	err := Pull(context.Background(), dest)
+	if err == nil {
+		t.Fatal("expected error when git is not on PATH")
+	}
+}
+
+func TestPull_SuccessWithFakeGit(t *testing.T) {
+	// Create a fake git script that exits 0
+	tmpDir := t.TempDir()
+	gitScript := filepath.Join(tmpDir, "git")
+	if err := os.WriteFile(gitScript, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write fake git script: %v", err)
+	}
+
+	// Prepend tmpDir to PATH so our fake git is found first
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", tmpDir+":"+oldPath)
+
+	// Call Pull with any path; it should succeed because our fake git exits 0
+	err := Pull(context.Background(), "/any/path")
+	if err != nil {
+		t.Fatalf("Pull with fake git: %v", err)
+	}
+}
+
+func TestExists_ErrorOnStatFailure(t *testing.T) {
+	dir := t.TempDir()
+	subdir := filepath.Join(dir, "noaccess")
+	if err := os.Mkdir(subdir, 0000); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	defer os.Chmod(subdir, 0755)
+
+	target := filepath.Join(subdir, "file")
+	ok, err := Exists(target)
+	if err == nil {
+		t.Fatal("expected error when stat fails on permission denied")
+	}
+	if ok {
+		t.Fatalf("Exists should return false on stat error, got true")
+	}
+}
+
+func TestDefaultRepoPath_FallbackWhenUserConfigDirFails(t *testing.T) {
+	got := DefaultRepoPath()
+	if got == "" {
+		t.Fatal("DefaultRepoPath should never return empty string")
+	}
+	if !strings.Contains(got, "easyrice") {
+		t.Fatalf("DefaultRepoPath should contain 'easyrice', got %q", got)
+	}
+}

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/creativeprojects/go-selfupdate"
 	"github.com/guneet-xyz/easyrice/internal/logger"
 )
 
@@ -53,7 +52,7 @@ func (u *Updater) Apply(ctx context.Context, release *Release) error {
 	// SECURITY: HTTPS only — release.AssetURL originates from go-selfupdate's
 	// GitHub source which uses HTTPS exclusively (see fetch.go).
 	assetFileName := filepath.Base(release.AssetURL)
-	if err := selfupdate.UpdateTo(ctx, release.AssetURL, assetFileName, realExe); err != nil {
+	if err := u.swapper.Swap(ctx, release.AssetURL, assetFileName, realExe); err != nil {
 		return fmt.Errorf("updater: apply update to %q: %w", realExe, err)
 	}
 

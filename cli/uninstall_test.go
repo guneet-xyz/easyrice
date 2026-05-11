@@ -163,3 +163,22 @@ func TestUninstall_FolderMode_SkipsWhenReplacedWithDir(t *testing.T) {
 	require.NoError(t, err, "user file inside dir should still exist")
 	assert.Equal(t, "user-data\n", string(data))
 }
+
+// TestUninstall_NoRepo documents the actual behavior: uninstall does NOT touch
+// the managed repo (it operates from state.json), so a missing repo with an
+// empty state surfaces as "package not installed", not ErrRepoNotInitialized.
+func TestUninstall_NoRepo(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	setIsolatedHome(t)
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"uninstall", "anything",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not installed",
+		"expected 'not installed' (uninstall reads state, not repo); got: %v", err)
+}

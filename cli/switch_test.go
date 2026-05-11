@@ -164,3 +164,46 @@ func TestSwitch_FolderModeToFileMode(t *testing.T) {
 	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "expected file symlink (not folder)")
 	assert.False(t, fi.IsDir(), "should be a file symlink, not a directory")
 }
+
+// TestSwitch_NoRepo asserts switch fails once the repo is gone, even when the
+// package was previously installed (state.json populated). Switch must consult
+// the manifest to validate the new profile.
+func TestSwitch_NoRepo(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	repoRoot, statePath, _ := setupTestRepo(t)
+	installCommonForSwitch(t, repoRoot, statePath)
+
+	require.NoError(t, os.RemoveAll(repoRoot), "remove repo to simulate missing state")
+
+	resetInstallFlags()
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"switch", "mypkg", "macbook",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "manifest",
+		"error must indicate manifest load failure; got: %v", err)
+}
+
+// TestSwitch_ProfileNotDeclared asserts switch fails when the new profile is
+// not declared in the manifest, even though the package is installed.
+func TestSwitch_ProfileNotDeclared(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	repoRoot, statePath, _ := setupTestRepo(t)
+	installCommonForSwitch(t, repoRoot, statePath)
+
+	resetInstallFlags()
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"switch", "mypkg", "ghost-profile",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ghost-profile",
+		"error must name the missing profile; got: %v", err)
+	assert.Contains(t, err.Error(), "not defined",
+		"error must indicate profile not defined; got: %v", err)
+}

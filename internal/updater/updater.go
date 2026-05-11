@@ -15,6 +15,7 @@ import (
 type Updater struct {
 	opts    Options
 	fetcher releaseFetcher
+	swapper swapper
 }
 
 // releaseFetcher abstracts release lookup behind an interface so callers can
@@ -44,5 +45,5 @@ func New(opts Options) (*Updater, error) {
 		opts.CacheDir = DefaultCacheDir()
 	}
 
-	return &Updater{opts: opts}, nil
+	return &Updater{opts: opts, swapper: &goSelfupdateSwapper{}}, nil
 }

@@ -93,3 +93,70 @@ func TestInit_AlreadyInitialized(t *testing.T) {
 
 	assert.False(t, errors.Is(err, repo.ErrRepoNotInitialized))
 }
+
+func TestInit_AlreadyExists(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	dest := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+
+	out, err := runRootCmd(t, "init", "https://example.invalid/repo.git")
+	require.Error(t, err, "out=%s", out)
+	msg := strings.ToLower(err.Error())
+	assert.True(t, strings.Contains(msg, "already") || strings.Contains(msg, "exists"),
+		"expected error to mention already/exists; got: %s", err.Error())
+}
+
+func TestInit_GitNotOnPath(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	emptyDir := t.TempDir()
+	t.Setenv("PATH", emptyDir)
+
+	out, err := runRootCmd(t, "init", "https://example.invalid/repo.git")
+	require.Error(t, err, "out=%s", out)
+}
+
+func TestInit_MissingURLArg(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	out, err := runRootCmd(t, "init")
+	require.Error(t, err, "out=%s", out)
+}
+
+func TestInit_SuccessWithFakeGit(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	binDir := t.TempDir()
+	gitPath := filepath.Join(binDir, "git")
+	script := "#!/bin/sh\nif [ \"$1\" = \"clone\" ]; then\n  /bin/mkdir -p \"$3\"\n  exit 0\nfi\nexit 0\n"
+	require.NoError(t, os.WriteFile(gitPath, []byte(script), 0o755))
+	t.Setenv("PATH", binDir)
+
+	out, err := runRootCmd(t, "init", "https://example.invalid/repo.git")
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Cloned to")
+
+	dest := repo.DefaultRepoPath()
+	_, err = os.Stat(dest)
+	require.NoError(t, err, "dest dir should exist after fake git clone")
+}
+
+func TestInit_ExistsStatError(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	dest := repo.DefaultRepoPath()
+	parent := filepath.Dir(dest)
+	require.NoError(t, os.MkdirAll(parent, 0o755))
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+	require.NoError(t, os.Chmod(parent, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) })
+
+	out, err := runRootCmd(t, "init", "https://example.invalid/repo.git")
+	require.Error(t, err, "out=%s", out)
+}

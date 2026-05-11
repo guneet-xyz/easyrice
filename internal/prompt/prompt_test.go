@@ -211,3 +211,233 @@ type errorReader struct{}
 func (e *errorReader) Read(p []byte) (n int, err error) {
 	return 0, io.ErrUnexpectedEOF
 }
+
+func TestRenderPlan_NilPlan(t *testing.T) {
+	var buf bytes.Buffer
+	RenderPlan(&buf, nil)
+	output := buf.String()
+	assert.Empty(t, output)
+}
+
+func TestRenderPlan_WithConflicts(t *testing.T) {
+	p := &plan.Plan{
+		PackageName: "test",
+		Profile:     "default",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/file1", Target: "/home/user/.config/file1"},
+		},
+		Conflicts: []plan.Conflict{
+			{Target: "/home/user/.config/conflict1", Reason: "already exists"},
+			{Target: "/home/user/.config/conflict2", Reason: "is a directory"},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "Plan: install test (profile: default)")
+	assert.Contains(t, output, "CREATE")
+	assert.Contains(t, output, "Total: 1 symlinks to create.")
+	assert.Contains(t, output, "Conflicts (2):")
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/conflict1: already exists")
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/conflict2: is a directory")
+}
+
+func TestRenderPlan_DirectoryOps(t *testing.T) {
+	p := &plan.Plan{
+		PackageName: "test",
+		Profile:     "default",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/dir", Target: "/home/user/.config/dir", IsDir: true},
+			{Kind: plan.OpRemove, Target: "/home/user/.config/olddir", IsDir: true},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "CREATE-DIR")
+	assert.Contains(t, output, "REMOVE-DIR")
+	assert.Contains(t, output, "/home/user/.config/dir")
+	assert.Contains(t, output, "/home/user/.config/olddir")
+}
+
+func TestRenderPlan_MultipleOps(t *testing.T) {
+	ops := []plan.Op{
+		{Kind: plan.OpCreate, Source: "src/file1", Target: "/home/user/.config/file1"},
+		{Kind: plan.OpCreate, Source: "src/file2", Target: "/home/user/.config/file2"},
+		{Kind: plan.OpCreate, Source: "src/file3", Target: "/home/user/.config/file3"},
+	}
+
+	p := &plan.Plan{
+		PackageName: "test",
+		Profile:     "default",
+		Ops:         ops,
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "Plan: install test (profile: default)")
+	assert.Contains(t, output, "src/file1")
+	assert.Contains(t, output, "src/file2")
+	assert.Contains(t, output, "src/file3")
+	assert.Contains(t, output, "/home/user/.config/file1")
+	assert.Contains(t, output, "/home/user/.config/file2")
+	assert.Contains(t, output, "/home/user/.config/file3")
+	assert.Contains(t, output, "Total: 3 symlinks to create.")
+}
+
+func TestRenderSwitchPlan_NilUninstall(t *testing.T) {
+	install := &plan.Plan{
+		PackageName: "test",
+		Profile:     "new",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/new", Target: "/home/user/.config/new"},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, nil, install)
+	output := buf.String()
+	assert.Empty(t, output)
+}
+
+func TestRenderSwitchPlan_NilInstall(t *testing.T) {
+	uninstall := &plan.Plan{
+		PackageName: "test",
+		Ops: []plan.Op{
+			{Kind: plan.OpRemove, Target: "/home/user/.config/old"},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, uninstall, nil)
+	output := buf.String()
+	assert.Empty(t, output)
+}
+
+func TestRenderSwitchPlan_BothNil(t *testing.T) {
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, nil, nil)
+	output := buf.String()
+	assert.Empty(t, output)
+}
+
+func TestRenderSwitchPlan_DirectoryOps(t *testing.T) {
+	uninstall := &plan.Plan{
+		PackageName: "test",
+		Ops: []plan.Op{
+			{Kind: plan.OpRemove, Target: "/home/user/.config/olddir", IsDir: true},
+		},
+	}
+
+	install := &plan.Plan{
+		PackageName: "test",
+		Profile:     "new",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/newdir", Target: "/home/user/.config/newdir", IsDir: true},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, uninstall, install)
+	output := buf.String()
+
+	assert.Contains(t, output, "Plan: uninstall test")
+	assert.Contains(t, output, "REMOVE-DIR")
+	assert.Contains(t, output, "/home/user/.config/olddir")
+	assert.Contains(t, output, "Plan: install test (profile: new)")
+	assert.Contains(t, output, "CREATE-DIR")
+	assert.Contains(t, output, "/home/user/.config/newdir")
+	assert.Contains(t, output, "Total: 2 symlinks (1 remove, 1 create).")
+}
+
+func TestRenderSwitchPlan_EmptyPlans(t *testing.T) {
+	uninstall := &plan.Plan{
+		PackageName: "test",
+		Ops:         []plan.Op{},
+	}
+
+	install := &plan.Plan{
+		PackageName: "test",
+		Profile:     "new",
+		Ops:         []plan.Op{},
+	}
+
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, uninstall, install)
+	output := buf.String()
+
+	assert.Contains(t, output, "Plan: uninstall test")
+	assert.Contains(t, output, "Plan: install test (profile: new)")
+	assert.Contains(t, output, "Total: 0 symlinks (0 remove, 0 create).")
+}
+
+func TestRenderSwitchPlan_WithConflicts(t *testing.T) {
+	uninstall := &plan.Plan{
+		PackageName: "test",
+		Ops: []plan.Op{
+			{Kind: plan.OpRemove, Target: "/home/user/.config/old"},
+		},
+	}
+
+	install := &plan.Plan{
+		PackageName: "test",
+		Profile:     "new",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/new", Target: "/home/user/.config/new"},
+		},
+		Conflicts: []plan.Conflict{
+			{Target: "/home/user/.config/conflict", Reason: "already exists"},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderSwitchPlan(&buf, uninstall, install)
+	output := buf.String()
+
+	assert.Contains(t, output, "Plan: uninstall test")
+	assert.Contains(t, output, "Plan: install test (profile: new)")
+	assert.Contains(t, output, "Conflicts (1):")
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/conflict: already exists")
+}
+
+func TestRenderConflicts_NoConflicts(t *testing.T) {
+	var buf bytes.Buffer
+	RenderConflicts(&buf, []plan.Conflict{})
+	output := buf.String()
+	assert.Empty(t, output)
+}
+
+func TestRenderConflicts_DirectoryConflicts(t *testing.T) {
+	conflicts := []plan.Conflict{
+		{Target: "/home/user/.config/dir1", Reason: "already exists", IsDir: true},
+		{Target: "/home/user/.config/dir2", Reason: "is a file", IsDir: true},
+	}
+
+	var buf bytes.Buffer
+	RenderConflicts(&buf, conflicts)
+	output := buf.String()
+
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/dir1: already exists (directory)")
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/dir2: is a file (directory)")
+}
+
+func TestRenderConflicts_MixedConflicts(t *testing.T) {
+	conflicts := []plan.Conflict{
+		{Target: "/home/user/.config/file", Reason: "already exists", IsDir: false},
+		{Target: "/home/user/.config/dir", Reason: "is a directory", IsDir: true},
+	}
+
+	var buf bytes.Buffer
+	RenderConflicts(&buf, conflicts)
+	output := buf.String()
+
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/file: already exists")
+	assert.NotContains(t, output, "already exists (directory)")
+	assert.Contains(t, output, "CONFLICT  /home/user/.config/dir: is a directory (directory)")
+}

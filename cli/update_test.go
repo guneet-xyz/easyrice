@@ -58,3 +58,43 @@ func TestUpdate_NotInitialized(t *testing.T) {
 	require.Error(t, err, "out=%s", out)
 	assert.True(t, errors.Is(err, repo.ErrRepoNotInitialized), "err=%v", err)
 }
+
+func TestUpdate_GitNotOnPath(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	// Create repos/default/ so Exists() passes, but git will fail
+	repoPath := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
+
+	// Set PATH to empty directory so git is not found
+	emptyDir := t.TempDir()
+	t.Setenv("PATH", emptyDir)
+
+	out, err := runRootCmd(t, "update")
+	require.Error(t, err, "update should fail when git not on PATH")
+	assert.Contains(t, err.Error(), "pull:", "error should mention pull operation")
+	assert.Contains(t, out, "executable file not found", "output should mention git not found")
+}
+
+func TestUpdate_SuccessWithFakeGit(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+
+	// Create repos/default/ so Exists() passes
+	repoPath := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
+
+	// Create a fake git script that exits 0
+	fakeGitDir := t.TempDir()
+	fakeGitPath := filepath.Join(fakeGitDir, "git")
+	require.NoError(t, os.WriteFile(fakeGitPath, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+
+	// Prepend fake git dir to PATH
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", fakeGitDir+":"+oldPath)
+
+	out, err := runRootCmd(t, "update")
+	require.NoError(t, err, "update should succeed with fake git: %s", out)
+	assert.Contains(t, out, "Pulled latest from origin")
+}

@@ -331,3 +331,75 @@ func TestCriticalLevelValue(t *testing.T) {
 	// CriticalLevel should be exactly ErrorLevel + 1
 	assert.Equal(t, Level(zapcore.ErrorLevel)+1, CriticalLevel)
 }
+
+func TestDefaultLogPath_ReturnsValidPath(t *testing.T) {
+	path := DefaultLogPath()
+
+	// Should be non-empty
+	assert.NotEmpty(t, path)
+
+	// Should contain "easyrice"
+	assert.Contains(t, path, "easyrice")
+
+	// Should be an absolute path
+	assert.True(t, filepath.IsAbs(path), "path should be absolute")
+}
+
+func TestDefaultLogPath_FallbackOnBadHome(t *testing.T) {
+	// Set HOME to an invalid/empty value to force fallback
+	t.Setenv("HOME", "")
+
+	// On POSIX systems, this should trigger the fallback chain
+	// The function should still return a valid path (either from fallback or hardcoded)
+	path := DefaultLogPath()
+
+	// Should be non-empty (either fallback path or hardcoded "easyrice.log")
+	assert.NotEmpty(t, path)
+
+	// Should contain "easyrice" (either in the path or as the filename)
+	assert.Contains(t, path, "easyrice")
+}
+
+func TestDefaultLogPath_ContainsLogsDirectory(t *testing.T) {
+	path := DefaultLogPath()
+
+	// Should contain "logs" directory component
+	assert.Contains(t, path, "logs")
+
+	// Should end with easyrice.log
+	assert.True(t, strings.HasSuffix(path, "easyrice.log"))
+}
+
+func TestParseLevel_ValidLevels(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected Level
+	}{
+		{"debug", DebugLevel},
+		{"info", InfoLevel},
+		{"warn", WarnLevel},
+		{"error", ErrorLevel},
+		{"critical", CriticalLevel},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			parsed, err := ParseLevel(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, parsed)
+		})
+	}
+}
+
+func TestParseLevel_InvalidLevel(t *testing.T) {
+	invalidLevels := []string{"verbose", "trace", "fatal", "unknown", ""}
+
+	for _, level := range invalidLevels {
+		t.Run(level, func(t *testing.T) {
+			_, err := ParseLevel(level)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid log level")
+			assert.Contains(t, err.Error(), "valid values: debug, info, warn, error, critical")
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,4 +209,41 @@ func TestDoctorNoReminderOnFailure(t *testing.T) {
 
 	assert.False(t, checkCalled, "reminder check must NOT run when doctor reports issues")
 	assert.NotContains(t, stderr, "A new release")
+}
+
+func TestDoctor_LegacyStateDetected(t *testing.T) {
+	resetInstallFlags()
+	homeDir := setIsolatedHome(t)
+	require.NoError(t, os.MkdirAll(repo.DefaultRepoPath(), 0o755))
+
+	legacyDir := filepath.Join(homeDir, ".config", "rice")
+	require.NoError(t, os.MkdirAll(legacyDir, 0o755))
+	legacyStatePath := filepath.Join(legacyDir, "state.json")
+	require.NoError(t, os.WriteFile(legacyStatePath, []byte("{}"), 0o644))
+
+	out, err := runInstallCmd(t, "",
+		"doctor",
+	)
+
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Warning: Legacy state found")
+	assert.Contains(t, out, legacyStatePath)
+}
+
+func TestDoctor_GitMissing(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	require.NoError(t, os.MkdirAll(repo.DefaultRepoPath(), 0o755))
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	t.Setenv("PATH", "")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, out, "[ERROR]")
+	assert.Contains(t, strings.ToLower(out), "git")
 }

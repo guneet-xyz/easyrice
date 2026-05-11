@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -224,4 +227,188 @@ func TestInstall_FolderMode_CreatesSingleSymlink(t *testing.T) {
 	require.True(t, ok, "folderpkg missing from state")
 	require.Len(t, pkg.InstalledLinks, 1)
 	assert.True(t, pkg.InstalledLinks[0].IsDir, "InstalledLinks[0].IsDir should be true")
+}
+
+// fileSHA256 returns the sha256 of file contents, or "" if the file does not exist.
+func fileSHA256(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return ""
+	}
+	require.NoError(t, err)
+	sum := sha256.Sum256(data)
+	return string(sum[:])
+}
+
+// TestInstall_NoRepo asserts install fails with ErrRepoNotInitialized when
+// the managed repo has not been cloned.
+func TestInstall_NoRepo(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	setIsolatedHome(t)
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "anything",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, repo.ErrRepoNotInitialized),
+		"expected ErrRepoNotInitialized, got: %v", err)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr), "state.json must not be created on no-repo failure")
+}
+
+// TestInstall_PackageNotDeclared asserts install fails when the requested
+// package is absent from rice.toml.
+func TestInstall_PackageNotDeclared(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "ghost-package",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ghost-package",
+		"error must name the missing package; got: %v", err)
+	assert.Contains(t, err.Error(), "not declared",
+		"error must indicate package not declared; got: %v", err)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr), "state.json must not be created on package-not-declared failure")
+}
+
+// TestInstall_ProfileNotDeclared asserts install fails when the package
+// exists but the requested profile is not defined.
+func TestInstall_ProfileNotDeclared(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "ghost-profile",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ghost-profile",
+		"error must name the missing profile; got: %v", err)
+	assert.Contains(t, err.Error(), "not defined",
+		"error must indicate profile not defined; got: %v", err)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr), "state.json must not be created on profile-not-declared failure")
+}
+
+// TestInstall_ConflictAbortsWithoutYes asserts that when a pre-existing file
+// at the install target produces a conflict, the install aborts and
+// state.json is NOT mutated.
+func TestInstall_ConflictAbortsWithoutYes(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, homeDir := setupTestRepo(t)
+
+	conflictTarget := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(conflictTarget), 0o755))
+	require.NoError(t, os.WriteFile(conflictTarget, []byte("pre-existing\n"), 0o644))
+
+	stateBefore := fileSHA256(t, statePath)
+
+	out, err := runInstallCmd(t, "n\n",
+		"--state", statePath,
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.Error(t, err, "expected conflict error; out=%s", err)
+	assert.Contains(t, out, "CONFLICT")
+
+	// Conflict should be reported BEFORE any prompt or state mutation.
+	stateAfter := fileSHA256(t, statePath)
+	assert.Equal(t, stateBefore, stateAfter,
+		"state.json must NOT be mutated after a conflict-abort")
+
+	// The pre-existing file must still be intact and a regular file.
+	fi, err := os.Lstat(conflictTarget)
+	require.NoError(t, err)
+	assert.Zero(t, fi.Mode()&os.ModeSymlink,
+		"pre-existing file must not be replaced with a symlink")
+}
+
+// TestInstall_OSNotSupported asserts install fails when the package's
+// supported_os excludes the current OS.
+func TestInstall_OSNotSupported(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	homeDir := setIsolatedHome(t)
+	repoRoot := repo.DefaultRepoPath()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	pkgDir := filepath.Join(repoRoot, "alienpkg")
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "common"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "common", "f.txt"), []byte("x"), 0o644))
+
+	otherOS := "windows"
+	if runtime.GOOS == "windows" {
+		otherOS = "linux"
+	}
+	manifest := `schema_version = 1
+
+[packages.alienpkg]
+description = "OS-restricted package"
+supported_os = ["` + otherOS + `"]
+
+[packages.alienpkg.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "alienpkg",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "os check",
+		"error must be wrapped with 'os check'; got: %v", err)
+	assert.Contains(t, err.Error(), "alienpkg",
+		"error must name the package; got: %v", err)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr), "state.json must not be created on os-check failure")
+	_ = homeDir
+}
+
+// TestInstall_MalformedManifestErrors asserts install surfaces a wrapped
+// error when rice.toml fails to parse.
+func TestInstall_MalformedManifestErrors(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	setIsolatedHome(t)
+	repoRoot := repo.DefaultRepoPath()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	require.NoError(t, os.MkdirAll(repoRoot, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(repoRoot, "rice.toml"),
+		[]byte("this is = not [valid toml\n"), 0o644))
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "anything",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "load manifest",
+		"error must be wrapped with 'load manifest'; got: %v", err)
 }

@@ -177,12 +177,92 @@ func TestIsSymlinkTo_ReturnsFalse_MissingPath(t *testing.T) {
 	}
 }
 
+func TestCreateSymlink_ErrorWhenParentDirPermissionDenied(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping permission test in CI environment")
+	}
+
+	tmpDir := t.TempDir()
+	parentDir := filepath.Join(tmpDir, "restricted")
+
+	if err := os.Mkdir(parentDir, 0755); err != nil {
+		t.Fatalf("failed to create parent directory: %v", err)
+	}
+	if err := os.Chmod(parentDir, 0555); err != nil {
+		t.Fatalf("failed to remove write permission: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Chmod(parentDir, 0755)
+	})
+
+	target := filepath.Join(parentDir, "subdir", "link.txt")
+	err := CreateSymlink("source.txt", target)
+	if err == nil {
+		t.Fatal("CreateSymlink should fail when parent directory is not writable")
+	}
+}
+
+func TestCreateSymlink_ErrorWhenCheckTargetFails(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping permission test in CI environment")
+	}
+
+	tmpDir := t.TempDir()
+	parentDir := filepath.Join(tmpDir, "restricted")
+
+	if err := os.Mkdir(parentDir, 0755); err != nil {
+		t.Fatalf("failed to create parent directory: %v", err)
+	}
+	if err := os.Chmod(parentDir, 0000); err != nil {
+		t.Fatalf("failed to remove all permissions: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Chmod(parentDir, 0755)
+	})
+
+	target := filepath.Join(parentDir, "link.txt")
+	err := CreateSymlink("source.txt", target)
+	if err == nil {
+		t.Fatal("CreateSymlink should fail when unable to check target")
+	}
+}
+
+func TestIsSymlinkTo_ReturnsFalseForRegularFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "regular.txt")
+
+	if err := os.WriteFile(target, []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	ok, err := IsSymlinkTo(target, "source.txt")
+	if err != nil {
+		t.Fatalf("IsSymlinkTo failed: %v", err)
+	}
+	if ok {
+		t.Error("IsSymlinkTo returned true for regular file, want false")
+	}
+}
+
+func TestReadLink_ErrorOnNonSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "regular.txt")
+
+	if err := os.WriteFile(target, []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	_, err := ReadLink(target)
+	if err == nil {
+		t.Fatal("ReadLink should fail when target is not a symlink")
+	}
+}
+
 func TestReadLink_HappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	source := "source.txt"
 	target := filepath.Join(tmpDir, "link.txt")
 
-	// Create a symlink
 	if err := os.Symlink(source, target); err != nil {
 		t.Fatalf("failed to create test symlink: %v", err)
 	}
