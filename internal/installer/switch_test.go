@@ -19,47 +19,34 @@ import (
 func switchSetup(t *testing.T, initialProfile, newProfile string) (SwitchRequest, *InstallResult) {
 	t.Helper()
 	repo := fixtureRepo(t)
-	homeDir := t.TempDir()
-	statePath := filepath.Join(t.TempDir(), "state.json")
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
 
-	installReq := InstallRequest{
-		RepoRoot:    repo,
-		PackageName: "mypkg",
-		Profile:     initialProfile,
-		CurrentOS:   runtime.GOOS,
-		HomeDir:     homeDir,
-		StatePath:   statePath,
-	}
+	installReq := newRequest(t, repo, "ghostty", initialProfile)
+
 	res, err := Install(installReq)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
 	return SwitchRequest{
 		RepoRoot:    repo,
-		PackageName: "mypkg",
+		PackageName: "ghostty",
 		NewProfile:  newProfile,
 		CurrentOS:   runtime.GOOS,
-		HomeDir:     homeDir,
-		StatePath:   statePath,
+		HomeDir:     installReq.HomeDir,
+		StatePath:   installReq.StatePath,
 	}, res
 }
 
 func TestBuildSwitchPlan_PackageNotInstalled(t *testing.T) {
 	repo := fixtureRepo(t)
-	homeDir := t.TempDir()
-	statePath := filepath.Join(t.TempDir(), "state.json")
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
+	installReq := newRequest(t, repo, "ghostty", "macbook")
 
 	req := SwitchRequest{
 		RepoRoot:    repo,
-		PackageName: "mypkg",
+		PackageName: "ghostty",
 		NewProfile:  "macbook",
 		CurrentOS:   runtime.GOOS,
-		HomeDir:     homeDir,
-		StatePath:   statePath,
+		HomeDir:     installReq.HomeDir,
+		StatePath:   installReq.StatePath,
 	}
 
 	sp, err := BuildSwitchPlan(req)
@@ -82,16 +69,16 @@ func TestBuildSwitchPlan_HappyPath_DoesNotTouchFilesystem(t *testing.T) {
 
 	assert.Equal(t, "macbook", sp.Uninstall.Profile)
 	assert.Equal(t, "common", sp.Install.Profile)
-	assert.Equal(t, "mypkg", sp.Uninstall.PackageName)
-	assert.Equal(t, "mypkg", sp.Install.PackageName)
+	assert.Equal(t, "ghostty", sp.Uninstall.PackageName)
+	assert.Equal(t, "ghostty", sp.Install.PackageName)
 	assert.Empty(t, sp.Install.Conflicts)
 	assert.Len(t, sp.Uninstall.Ops, len(initialResult.LinksCreated))
 
 	// State unchanged after build.
 	stateAfter, err := state.Load(req.StatePath)
 	require.NoError(t, err)
-	assert.Equal(t, stateBefore["mypkg"].Profile, stateAfter["mypkg"].Profile)
-	assert.Equal(t, stateBefore["mypkg"].InstalledLinks, stateAfter["mypkg"].InstalledLinks)
+	assert.Equal(t, stateBefore["ghostty"].Profile, stateAfter["ghostty"].Profile)
+	assert.Equal(t, stateBefore["ghostty"].InstalledLinks, stateAfter["ghostty"].InstalledLinks)
 
 	// Existing symlinks remain intact, no new ones created.
 	for _, link := range initialResult.LinksCreated {
@@ -115,7 +102,7 @@ func TestBuildSwitchPlan_PreFlight_ConflictFromForeignFile(t *testing.T) {
 	// Create a non-rice file at a target that the new profile would create
 	// but the old profile did NOT manage (config.toml from package root, only
 	// present in the `common` profile).
-	conflictPath := filepath.Join(req.HomeDir, ".config", "mypkg", "config.toml")
+	conflictPath := filepath.Join(req.HomeDir, ".config", "ghostty", "settings")
 	require.NoError(t, os.MkdirAll(filepath.Dir(conflictPath), 0o755))
 	require.NoError(t, os.WriteFile(conflictPath, []byte("foreign"), 0o644))
 
@@ -133,12 +120,6 @@ func TestBuildSwitchPlan_PreFlight_ConflictFromForeignFile(t *testing.T) {
 }
 
 func TestBuildSwitchPlan_PreFlight_OldLinkReusedNotConflict(t *testing.T) {
-	// Set up a scenario where the new profile's target equals an old managed link.
-	// macbook installs base.toml + machine.toml at ~/.config/mypkg/.
-	// We then construct a synthetic "new install plan" by manually placing
-	// foreign files at one of the old managed targets. Without ignoreTargets,
-	// this would be a conflict; with ignoreTargets (because the uninstall plan
-	// removes that target first), it must NOT be reported as a conflict.
 	req, initialResult := switchSetup(t, "macbook", "macbook")
 
 	// Pick an old-link target and overwrite the symlink with a foreign file
@@ -184,13 +165,12 @@ func TestExecuteSwitchPlan_HappyPath(t *testing.T) {
 	// State reflects new profile.
 	st, err := state.Load(req.StatePath)
 	require.NoError(t, err)
-	pkg, ok := st["mypkg"]
+	pkg, ok := st["ghostty"]
 	require.True(t, ok)
 	assert.Equal(t, "common", pkg.Profile)
 	assert.NotEmpty(t, pkg.InstalledLinks)
 
-	// New profile target (config.toml) is now a symlink we manage.
-	configTarget := filepath.Join(req.HomeDir, ".config", "mypkg", "config.toml")
+	configTarget := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
 	fi, err := os.Lstat(configTarget)
 	require.NoError(t, err)
 	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "config.toml should be a symlink")
@@ -223,20 +203,17 @@ func TestSwitch_ConvenienceWrapperEndToEnd(t *testing.T) {
 
 	st, err := state.Load(req.StatePath)
 	require.NoError(t, err)
-	pkg, ok := st["mypkg"]
+	pkg, ok := st["ghostty"]
 	require.True(t, ok)
 	assert.Equal(t, "macbook", pkg.Profile)
 
-	// config.toml from common (root) is no longer in macbook profile, so removed.
-	configTarget := filepath.Join(req.HomeDir, ".config", "mypkg", "config.toml")
-	_, statErr := os.Lstat(configTarget)
-	assert.True(t, os.IsNotExist(statErr), "config.toml should be removed after switch to macbook")
+	configTarget := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
+	fi, err := os.Lstat(configTarget)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink)
 
-	// base.toml + machine.toml still present.
-	for _, name := range []string{"base.toml", "machine.toml"} {
-		p := filepath.Join(req.HomeDir, ".config", "mypkg", name)
-		fi, err := os.Lstat(p)
-		require.NoError(t, err)
-		assert.NotZero(t, fi.Mode()&os.ModeSymlink)
-	}
+	extraTarget := filepath.Join(req.HomeDir, ".config", "ghostty", "extra")
+	fi2, err := os.Lstat(extraTarget)
+	require.NoError(t, err)
+	assert.NotZero(t, fi2.Mode()&os.ModeSymlink)
 }

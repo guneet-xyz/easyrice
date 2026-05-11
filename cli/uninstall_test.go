@@ -12,7 +12,6 @@ import (
 func installForUninstall(t *testing.T, repoRoot, statePath string) {
 	t.Helper()
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "mypkg",
@@ -103,7 +102,6 @@ func TestUninstall_NotInstalledErrors(t *testing.T) {
 func installFolderpkg(t *testing.T, repoRoot, statePath string) {
 	t.Helper()
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "folderpkg",

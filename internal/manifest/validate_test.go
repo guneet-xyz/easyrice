@@ -7,528 +7,474 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	tests := []struct {
-		name     string
-		manifest *Manifest
-		wantErr  bool
-		errMsg   string
+	cases := []struct {
+		name      string
+		manifest  *Manifest
+		wantErr   bool
+		errSubstr string
 	}{
-		// Rule 1: SchemaVersion must be 1
+		// Happy path: valid manifest with one package and one profile
 		{
-			name: "valid schema version 1",
+			name: "valid manifest with one package",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						Description: "Neovim config",
+						SupportedOS: []string{"linux", "darwin"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
 			wantErr: false,
 		},
+
+		// Happy path: multiple packages
+		{
+			name: "valid manifest with multiple packages",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+					"zsh": {
+						SupportedOS: []string{"darwin"},
+						Profiles: map[string]ProfileDef{
+							"work": {
+								Sources: []SourceSpec{
+									{Path: "zshrc", Mode: "file", Target: "$HOME/.zshrc"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Happy path: folder mode
+		{
+			name: "valid manifest with folder mode",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"ghostty": {
+						SupportedOS: []string{"darwin"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "folder", Target: "$HOME/.config/ghostty"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Happy path: with optional Root field
+		{
+			name: "valid manifest with root field",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						Root:        "nvim-config",
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Negative: bad schema version
 		{
 			name: "invalid schema version 0",
 			manifest: &Manifest{
 				SchemaVersion: 0,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "unsupported schema_version: 0",
-		},
-		{
-			name: "invalid schema version 2",
-			manifest: &Manifest{
-				SchemaVersion: 2,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "unsupported schema_version: 2",
+			wantErr:   true,
+			errSubstr: "unsupported schema_version",
 		},
 
-		// Rule 2: Name must be non-empty
+		// Negative: no packages
 		{
-			name: "valid non-empty name",
+			name: "no packages declared",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "mypackage",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
+				Packages:      map[string]PackageDef{},
 			},
-			wantErr: false,
-		},
-		{
-			name: "empty name",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "name is required and must not be empty",
-		},
-		{
-			name: "whitespace-only name",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "   ",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "name is required and must not be empty",
+			wantErr:   true,
+			errSubstr: "no packages declared",
 		},
 
-		// Rule 3: SupportedOS must be non-empty and each element must be in {linux, darwin, windows}
+		// Negative: empty package name
 		{
-			name: "valid single OS linux",
+			name: "empty package name",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "package name must not be empty",
 		},
+
+		// Negative: package name with slash
 		{
-			name: "valid single OS darwin",
+			name: "package name with slash",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"darwin"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim/config": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "must not contain slashes",
 		},
+
+		// Negative: package name with whitespace
 		{
-			name: "valid single OS windows",
+			name: "package name with whitespace",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"windows"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim config": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "must not contain whitespace",
 		},
-		{
-			name: "valid multiple OS",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux", "darwin", "windows"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: false,
-		},
+
+		// Negative: empty supported_os
 		{
 			name: "empty supported_os",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "supported_os must not be empty",
-		},
-		{
-			name: "invalid OS freebsd",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"freebsd"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "unsupported OS: \"freebsd\"",
-		},
-		{
-			name: "mixed valid and invalid OS",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux", "macos"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "unsupported OS: \"macos\"",
+			wantErr:   true,
+			errSubstr: "supported_os must not be empty",
 		},
 
-		// Rule 4: At least one profile must be defined; each profile's Sources must be non-empty
+		// Negative: invalid OS
 		{
-			name: "valid single profile",
+			name: "invalid OS",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"freebsd"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "unsupported OS",
 		},
+
+		// Negative: root starts with /
 		{
-			name: "valid multiple profiles",
+			name: "root starts with /",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"personal": {Sources: []SourceSpec{{Path: "file1.txt", Mode: "file", Target: "$HOME"}}},
-					"work":     {Sources: []SourceSpec{{Path: "file2.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						Root:        "/absolute/path",
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "root must not start with /",
 		},
+
+		// Negative: root contains ..
+		{
+			name: "root contains ..",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						Root:        "config/../other",
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "root must not contain .. segments",
+		},
+
+		// Negative: no profiles
 		{
 			name: "no profiles",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles:      map[string]ProfileDef{},
-			},
-			wantErr: true,
-			errMsg:  "at least one profile must be defined",
-		},
-		{
-			name: "profile with empty sources",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles:    map[string]ProfileDef{},
+					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "profile \"default\" has no sources",
-		},
-		{
-			name: "one profile valid, one with empty sources",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"personal": {Sources: []SourceSpec{{Path: "file.txt", Mode: "file", Target: "$HOME"}}},
-					"work":     {Sources: []SourceSpec{}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "profile \"work\" has no sources",
+			wantErr:   true,
+			errSubstr: "at least one profile must be defined",
 		},
 
-		// Rule 5: Each Sources entry must be a relative path (no leading /, no .. segments)
+		// Negative: empty profile name
 		{
-			name: "valid relative path",
+			name: "empty profile name",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config/file.txt", Mode: "file", Target: "$HOME"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "valid nested relative path",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "a/b/c/file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "absolute path with leading slash",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "/etc/config", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "must be a relative path (no leading /)",
-		},
-		{
-			name: "path with .. segment",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "../config/file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "must not contain .. segments",
-		},
-		{
-			name: "path with .. in middle",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "a/../b/file.txt", Mode: "file", Target: "$HOME"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "must not contain .. segments",
+			wantErr:   true,
+			errSubstr: "profile name must not be empty",
 		},
 
-		// Source mode and target tests
+		// Negative: no sources in profile
 		{
-			name: "folder-mode source with valid target",
+			name: "no sources in profile",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "folder", Target: "$HOME/.config/nvim"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "folder-mode source missing target",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "folder"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "target is required",
-		},
-		{
-			name: "file-mode source with valid target",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file", Target: "$HOME/.config"}}},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "file-mode source missing target",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "target is required",
-		},
-		{
-			name: "empty mode is invalid",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "", Target: "$HOME/.config"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "mode must be \"file\" or \"folder\"",
-		},
-		{
-			name: "unknown mode value",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "symlink"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "mode must be \"file\" or \"folder\"",
-		},
-		{
-			name: "source target with invalid prefix",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file", Target: "/etc/config"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "must start with one of",
+			wantErr:   true,
+			errSubstr: "has no sources",
 		},
 
-		// Integration tests: multiple rules
+		// Negative: empty source path
 		{
-			name: "comprehensive valid manifest",
+			name: "empty source path",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "nvim",
-				Description:   "Neovim configuration",
-				SupportedOS:   []string{"linux", "darwin"},
-				ProfileKey:    "nvim_profile",
-				Profiles: map[string]ProfileDef{
-					"personal": {Sources: []SourceSpec{{Path: "init.lua", Mode: "file", Target: "$HOME/.config/nvim"}, {Path: "lua/config.lua", Mode: "file", Target: "$HOME/.config/nvim"}}},
-					"work":     {Sources: []SourceSpec{{Path: "init.lua", Mode: "file", Target: "$HOME/.config/nvim"}, {Path: "lua/work.lua", Mode: "file", Target: "$HOME/.config/nvim"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "comprehensive invalid manifest (multiple errors, first caught)",
-			manifest: &Manifest{
-				SchemaVersion: 2,
-				Name:          "",
-				SupportedOS:   []string{},
-				Profiles:      map[string]ProfileDef{},
-			},
-			wantErr: true,
-			errMsg:  "unsupported schema_version: 2",
+			wantErr:   true,
+			errSubstr: "path must not be empty",
 		},
 
-		// Source mode and target tests
+		// Negative: source path with ..
 		{
-			name: "folder-mode source with valid target",
+			name: "source path with ..",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "folder", Target: "$HOME/.config/nvim"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config/../other", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "must not contain .. segments",
 		},
+
+		// Negative: source path with leading /
 		{
-			name: "folder-mode source missing target",
+			name: "source path with leading /",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "folder"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "/absolute/path", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "target is required",
+			wantErr:   true,
+			errSubstr: "must be relative",
 		},
+
+		// Negative: invalid mode
 		{
-			name: "file-mode source with valid target",
+			name: "invalid mode",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file", Target: "$HOME/.config"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "symlink", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: false,
+			wantErr:   true,
+			errSubstr: "mode must be \"file\" or \"folder\"",
 		},
+
+		// Negative: empty target
 		{
-			name: "file-mode source missing target",
+			name: "empty target",
 			manifest: &Manifest{
 				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file"}}},
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: ""},
+								},
+							},
+						},
+					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "target is required",
-		},
-		{
-			name: "empty mode is invalid",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "", Target: "$HOME/.config"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "mode must be \"file\" or \"folder\"",
-		},
-		{
-			name: "unknown mode value",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "nvim", Mode: "symlink"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "mode must be \"file\" or \"folder\"",
-		},
-		{
-			name: "source target with invalid prefix",
-			manifest: &Manifest{
-				SchemaVersion: 1,
-				Name:          "test",
-				SupportedOS:   []string{"linux"},
-				Profiles: map[string]ProfileDef{
-					"default": {Sources: []SourceSpec{{Path: "config.txt", Mode: "file", Target: "/etc/config"}}},
-				},
-			},
-			wantErr: true,
-			errMsg:  "must start with one of",
+			wantErr:   true,
+			errSubstr: "target must not be empty",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := Validate(tt.manifest)
-			if tt.wantErr {
-				assert.Error(t, err, "expected error but got none")
-				assert.Contains(t, err.Error(), tt.errMsg, "error message mismatch")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Validate(tc.manifest)
+			if tc.wantErr {
+				assert.Error(t, err, "expected error but got nil")
+				if tc.errSubstr != "" {
+					assert.Contains(t, err.Error(), tc.errSubstr, "error message should contain substring")
+				}
 			} else {
 				assert.NoError(t, err, "expected no error but got: %v", err)
 			}

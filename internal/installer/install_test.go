@@ -4,21 +4,22 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/plan"
+	"github.com/guneet-xyz/easyrice/internal/profile"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/symlink"
 )
 
-// fixtureRepo copies testdata/install into a temp dir and returns its path.
-// We copy because some tests modify the repo and we want isolation.
 func fixtureRepo(t *testing.T) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "testdata", "install")
+	src := filepath.Join("..", "..", "testdata", "install_v2")
 	dst := t.TempDir()
 	require.NoError(t, copyDir(src, dst))
 	return dst
@@ -45,16 +46,24 @@ func copyDir(src, dst string) error {
 	})
 }
 
-func newRequest(t *testing.T, repoRoot, profile string) InstallRequest {
+func newRequest(t *testing.T, repoRoot, pkgName, profileName string) InstallRequest {
 	t.Helper()
+	m, err := manifest.LoadFile(filepath.Join(repoRoot, "rice.toml"))
+	require.NoError(t, err)
+	pkg, ok := m.Packages[pkgName]
+	require.True(t, ok, "package %q not found in fixture", pkgName)
+	specs, err := profile.ResolveSpecs(&pkg, pkgName, profileName)
+	require.NoError(t, err)
 	homeDir := t.TempDir()
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
 	return InstallRequest{
 		RepoRoot:    repoRoot,
-		PackageName: "mypkg",
-		Profile:     profile,
+		PackageName: pkgName,
+		ProfileName: profileName,
+		Pkg:         &pkg,
+		Specs:       specs,
 		CurrentOS:   runtime.GOOS,
 		HomeDir:     homeDir,
 		StatePath:   statePath,
@@ -63,68 +72,56 @@ func newRequest(t *testing.T, repoRoot, profile string) InstallRequest {
 
 func TestBuildInstallPlan_DoesNotTouchFilesystem(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	// HomeDir must remain empty
 	entries, err := os.ReadDir(req.HomeDir)
 	require.NoError(t, err)
 	assert.Empty(t, entries, "BuildInstallPlan must not create files in HomeDir")
 
-	// State file must not exist
 	_, err = os.Stat(req.StatePath)
 	assert.True(t, os.IsNotExist(err), "BuildInstallPlan must not write state file")
 }
 
 func TestBuildInstallPlan_MultiSourceProfile(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	assert.Equal(t, "mypkg", p.PackageName)
+	assert.Equal(t, "ghostty", p.PackageName)
 	assert.Equal(t, "macbook", p.Profile)
 	assert.Empty(t, p.Conflicts)
 
-	// Expect 2 ops: base.toml from common, machine.toml from macbook
 	targets := make(map[string]string)
 	for _, op := range p.Ops {
 		assert.Equal(t, plan.OpCreate, op.Kind)
 		targets[op.Target] = op.Source
 	}
 
-	expectBase := filepath.Join(req.HomeDir, ".config", "mypkg", "base.toml")
-	expectMachine := filepath.Join(req.HomeDir, ".config", "mypkg", "machine.toml")
-	assert.Contains(t, targets, expectBase)
-	assert.Contains(t, targets, expectMachine)
+	expectConfig := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
+	expectExtra := filepath.Join(req.HomeDir, ".config", "ghostty", "extra")
+	assert.Contains(t, targets, expectConfig)
+	assert.Contains(t, targets, expectExtra)
 
-	// Source paths point into the correct subdir
-	assert.Contains(t, targets[expectBase], filepath.Join("mypkg", "common", ".config", "mypkg", "base.toml"))
-	assert.Contains(t, targets[expectMachine], filepath.Join("mypkg", "macbook", ".config", "mypkg", "machine.toml"))
+	assert.Contains(t, targets[expectConfig], filepath.Join("ghostty", "common", "config"))
+	assert.Contains(t, targets[expectExtra], filepath.Join("ghostty", "macbook", "extra"))
 }
 
-func TestBuildInstallPlan_SingleSourceDot(t *testing.T) {
+func TestBuildInstallPlan_SingleSourceProfile(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "common")
+	req := newRequest(t, repo, "ghostty", "common")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
 	require.NotNil(t, p)
 
-	// sources = ["."] walks the whole package root.
-	// rice.toml must be skipped.
-	for _, op := range p.Ops {
-		assert.NotEqual(t, "rice.toml", filepath.Base(op.Source),
-			"rice.toml must be skipped")
-	}
-
-	// Must include .config/mypkg/config.toml at the package root
-	wantTarget := filepath.Join(req.HomeDir, ".config", "mypkg", "config.toml")
+	wantTarget := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
 	found := false
 	for _, op := range p.Ops {
 		if op.Target == wantTarget {
@@ -136,7 +133,10 @@ func TestBuildInstallPlan_SingleSourceDot(t *testing.T) {
 
 func TestBuildInstallPlan_SkipsRiceToml(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "common")
+	require.NoError(t, os.WriteFile(
+		filepath.Join(repo, "ghostty", "common", "rice.toml"),
+		[]byte("ignored"), 0o644))
+	req := newRequest(t, repo, "ghostty", "common")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
@@ -149,10 +149,9 @@ func TestBuildInstallPlan_SkipsRiceToml(t *testing.T) {
 
 func TestBuildInstallPlan_ConflictReturnsError(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
-	// Pre-create a conflicting file in HomeDir
-	conflictPath := filepath.Join(req.HomeDir, ".config", "mypkg", "base.toml")
+	conflictPath := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
 	require.NoError(t, os.MkdirAll(filepath.Dir(conflictPath), 0o755))
 	require.NoError(t, os.WriteFile(conflictPath, []byte("pre-existing"), 0o644))
 
@@ -170,7 +169,7 @@ func TestBuildInstallPlan_ConflictReturnsError(t *testing.T) {
 
 func TestExecuteInstallPlan_CreatesSymlinks(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
@@ -193,7 +192,7 @@ func TestExecuteInstallPlan_CreatesSymlinks(t *testing.T) {
 
 func TestExecuteInstallPlan_UpdatesState(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
@@ -203,51 +202,21 @@ func TestExecuteInstallPlan_UpdatesState(t *testing.T) {
 
 	st, err := state.Load(req.StatePath)
 	require.NoError(t, err)
-	pkg, ok := st["mypkg"]
-	require.True(t, ok, "state should contain mypkg")
+	pkg, ok := st["ghostty"]
+	require.True(t, ok, "state should contain ghostty")
 	assert.Equal(t, "macbook", pkg.Profile)
 	assert.Len(t, pkg.InstalledLinks, len(p.Ops))
 	assert.False(t, pkg.InstalledAt.IsZero())
 }
 
-func TestInstall_UnsupportedOS(t *testing.T) {
-	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
-	req.CurrentOS = "plan9"
-
-	_, err := Install(req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "plan9")
-}
-
-func TestInstall_UnknownPackage(t *testing.T) {
-	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
-	req.PackageName = "nonexistent"
-
-	_, err := Install(req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
-}
-
-func TestInstall_UnknownProfile(t *testing.T) {
-	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "no-such-profile")
-
-	_, err := Install(req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no-such-profile")
-}
-
 func TestInstall_Idempotent(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	result1, err := Install(req)
 	require.NoError(t, err)
 	require.NotEmpty(t, result1.LinksCreated)
 
-	// Second run with the same args must succeed: existing-correct symlinks are not conflicts.
 	result2, err := Install(req)
 	require.NoError(t, err)
 	assert.Equal(t, len(result1.LinksCreated), len(result2.LinksCreated))
@@ -255,22 +224,54 @@ func TestInstall_Idempotent(t *testing.T) {
 
 func TestInstall_FullFlow(t *testing.T) {
 	repo := fixtureRepo(t)
-	req := newRequest(t, repo, "macbook")
+	req := newRequest(t, repo, "ghostty", "macbook")
 
 	result, err := Install(req)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotEmpty(t, result.LinksCreated)
 
-	// Verify state persisted
 	st, err := state.Load(req.StatePath)
 	require.NoError(t, err)
-	assert.Contains(t, st, "mypkg")
+	assert.Contains(t, st, "ghostty")
 
-	// Verify all symlinks exist and point correctly
 	for _, link := range result.LinksCreated {
 		ok, err := symlink.IsSymlinkTo(link.Target, link.Source)
 		require.NoError(t, err)
 		assert.True(t, ok)
+	}
+}
+
+func TestBuildInstallPlan_RootDefaultsToName(t *testing.T) {
+	repo := fixtureRepo(t)
+	req := newRequest(t, repo, "ghostty", "common")
+
+	require.Empty(t, req.Pkg.Root, "ghostty fixture must have empty Root")
+
+	p, err := BuildInstallPlan(req)
+	require.NoError(t, err)
+	require.NotEmpty(t, p.Ops)
+
+	for _, op := range p.Ops {
+		assert.True(t, strings.Contains(op.Source, string(os.PathSeparator)+"ghostty"+string(os.PathSeparator)),
+			"source path must traverse the package-named directory, got %q", op.Source)
+	}
+}
+
+func TestBuildInstallPlan_RootCustom(t *testing.T) {
+	repo := fixtureRepo(t)
+	req := newRequest(t, repo, "nvim", "default")
+
+	require.Equal(t, "nvim-custom", req.Pkg.Root, "nvim fixture must declare Root=nvim-custom")
+
+	p, err := BuildInstallPlan(req)
+	require.NoError(t, err)
+	require.NotEmpty(t, p.Ops)
+
+	for _, op := range p.Ops {
+		assert.True(t, strings.Contains(op.Source, string(os.PathSeparator)+"nvim-custom"+string(os.PathSeparator)),
+			"source path must traverse the custom Root directory, got %q", op.Source)
+		assert.False(t, strings.Contains(op.Source, string(os.PathSeparator)+"nvim"+string(os.PathSeparator)+"config"),
+			"source path must NOT use package name when Root is set, got %q", op.Source)
 	}
 }

@@ -10,17 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
 )
 
 func setupFolderTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
 	t.Helper()
-	root := t.TempDir()
-	repoRoot = filepath.Join(root, "repo")
-	homeDir = filepath.Join(root, "home")
-	statePath = filepath.Join(root, "state.json")
-
-	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+	homeDir = setIsolatedHome(t)
+	repoRoot = repo.DefaultRepoPath()
+	statePath = filepath.Join(t.TempDir(), "state.json")
 
 	pkgDir := filepath.Join(repoRoot, "folderpkg")
 	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "cfg"), 0o755))
@@ -29,65 +27,59 @@ func setupFolderTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
 		[]byte("k=v\n"), 0o644))
 
 	manifest := `schema_version = 1
-name = "folderpkg"
+
+[packages.folderpkg]
 description = "Folder-mode test package"
 supported_os = ["linux", "darwin", "windows"]
 
-[profiles.common]
+[packages.folderpkg.profiles.common]
 sources = [{path = "cfg", mode = "folder", target = "$HOME/.config/folderpkg"}]
 
-[profiles.filemode]
+[packages.folderpkg.profiles.filemode]
 sources = [{path = "cfg", mode = "file", target = "$HOME"}]
 `
 	require.NoError(t, os.WriteFile(
-		filepath.Join(pkgDir, "rice.toml"), []byte(manifest), 0o644))
+		filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
 
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
 	return
 }
 
 func resetInstallFlags() {
 	flagProfile = ""
 	flagYes = false
-	flagRepo = "."
 	flagState = state.DefaultPath()
 	flagLogLevel = ""
 }
 
 func setupTestRepo(t *testing.T) (repoRoot, statePath, homeDir string) {
 	t.Helper()
-	root := t.TempDir()
-	repoRoot = filepath.Join(root, "repo")
-	homeDir = filepath.Join(root, "home")
-	statePath = filepath.Join(root, "state.json")
-
-	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+	homeDir = setIsolatedHome(t)
+	repoRoot = repo.DefaultRepoPath()
+	statePath = filepath.Join(t.TempDir(), "state.json")
 
 	pkgDir := filepath.Join(repoRoot, "mypkg")
 	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "common", ".config", "mypkg"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "macbook", ".config", "mypkg"), 0o755))
 
 	manifest := `schema_version = 1
-name = "mypkg"
+
+[packages.mypkg]
 description = "Test package"
 supported_os = ["linux", "darwin", "windows"]
 
-[profiles.common]
+[packages.mypkg.profiles.common]
 sources = [{path = "common", mode = "file", target = "$HOME"}]
 
-[profiles.macbook]
+[packages.mypkg.profiles.macbook]
 sources = [
   {path = "common", mode = "file", target = "$HOME"},
   {path = "macbook", mode = "file", target = "$HOME"},
 ]
 `
-	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "rice.toml"), []byte(manifest), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "common", ".config", "mypkg", "base.toml"), []byte("base=true\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "macbook", ".config", "mypkg", "machine.toml"), []byte("machine=true\n"), 0o644))
 
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
 	return
 }
 
@@ -99,7 +91,6 @@ func runInstallCmd(t *testing.T, stdin string, args ...string) (string, error) {
 	rootCmd.SetIn(strings.NewReader(stdin))
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
-	// Restore I/O so leaked writers don't affect later tests.
 	rootCmd.SetIn(os.Stdin)
 	rootCmd.SetOut(os.Stdout)
 	rootCmd.SetErr(os.Stderr)
@@ -108,10 +99,9 @@ func runInstallCmd(t *testing.T, stdin string, args ...string) (string, error) {
 
 func TestInstall_WithYesFlag(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupTestRepo(t)
+	_, statePath, homeDir := setupTestRepo(t)
 
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "mypkg",
@@ -129,10 +119,9 @@ func TestInstall_WithYesFlag(t *testing.T) {
 
 func TestInstall_StdinYesProceeds(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupTestRepo(t)
+	_, statePath, homeDir := setupTestRepo(t)
 
 	out, err := runInstallCmd(t, "y\n",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"install", "mypkg",
 		"--profile", "common",
@@ -147,10 +136,9 @@ func TestInstall_StdinYesProceeds(t *testing.T) {
 
 func TestInstall_StdinNoAborts(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupTestRepo(t)
+	_, statePath, homeDir := setupTestRepo(t)
 
 	out, err := runInstallCmd(t, "n\n",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"install", "mypkg",
 		"--profile", "common",
@@ -171,14 +159,13 @@ func TestInstall_NoArgsErrors(t *testing.T) {
 
 func TestInstall_ShowsConflictDetails(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupTestRepo(t)
+	_, statePath, homeDir := setupTestRepo(t)
 
 	conflictTarget := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
 	require.NoError(t, os.MkdirAll(filepath.Dir(conflictTarget), 0o755))
 	require.NoError(t, os.WriteFile(conflictTarget, []byte("existing\n"), 0o644))
 
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "mypkg",
@@ -191,10 +178,9 @@ func TestInstall_ShowsConflictDetails(t *testing.T) {
 
 func TestInstall_WithProfileFlag(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupTestRepo(t)
+	_, statePath, homeDir := setupTestRepo(t)
 
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "mypkg",
@@ -214,7 +200,6 @@ func TestInstall_FolderMode_CreatesSingleSymlink(t *testing.T) {
 	repoRoot, statePath, homeDir := setupFolderTestRepo(t)
 
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "folderpkg",

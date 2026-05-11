@@ -3,7 +3,6 @@ package installer
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -13,31 +12,16 @@ import (
 
 func folderFixtureRepo(t *testing.T) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "testdata", "install")
+	src := filepath.Join("..", "..", "testdata", "install_v2")
 	dst := t.TempDir()
 	require.NoError(t, copyDir(src, dst))
 	return dst
 }
 
-func newFolderRequest(t *testing.T, repoRoot, pkg, profile string) InstallRequest {
-	t.Helper()
-	homeDir := t.TempDir()
-	statePath := filepath.Join(t.TempDir(), "state.json")
-	t.Setenv("HOME", homeDir)
-	t.Setenv("USERPROFILE", homeDir)
-	return InstallRequest{
-		RepoRoot:    repoRoot,
-		PackageName: pkg,
-		Profile:     profile,
-		CurrentOS:   runtime.GOOS,
-		HomeDir:     homeDir,
-		StatePath:   statePath,
-	}
-}
-
 func TestBuildInstallPlan_FolderMode(t *testing.T) {
 	repo := folderFixtureRepo(t)
-	req := newFolderRequest(t, repo, "folder-pkg", "common")
+	// nvim uses folder mode with root = "nvim-custom", profile "default"
+	req := newRequest(t, repo, "nvim", "default")
 
 	p, err := BuildInstallPlan(req)
 	require.NoError(t, err)
@@ -47,11 +31,11 @@ func TestBuildInstallPlan_FolderMode(t *testing.T) {
 	op := p.Ops[0]
 	assert.True(t, op.IsDir, "folder-mode op must have IsDir=true")
 
-	assert.True(t, strings.HasSuffix(op.Source, string(os.PathSeparator)+"cfg"),
-		"Source should end in /cfg, got %q", op.Source)
+	assert.True(t, strings.HasSuffix(op.Source, string(os.PathSeparator)+"config"),
+		"Source should end in /config, got %q", op.Source)
 	assert.True(t, filepath.IsAbs(op.Source), "Source should be absolute, got %q", op.Source)
 
-	expectTarget := filepath.Join(req.HomeDir, ".config", "myfolder")
+	expectTarget := filepath.Join(req.HomeDir, ".config", "nvim")
 	assert.Equal(t, expectTarget, op.Target)
 
 	assert.Empty(t, p.Conflicts)
@@ -119,7 +103,7 @@ func TestDetectConflicts_FolderMode_ForeignSymlink(t *testing.T) {
 
 func TestBuildInstallPlan_OverlayRejection_TwoFolderSources(t *testing.T) {
 	repo := folderFixtureRepo(t)
-	req := newFolderRequest(t, repo, "folder-overlay-pkg", "common")
+	req := newRequest(t, repo, "folder-overlay-pkg", "common")
 
 	p, err := BuildInstallPlan(req)
 	require.Error(t, err, "two folder-mode sources targeting same path must fail planning")

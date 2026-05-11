@@ -1,0 +1,35 @@
+schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal emulator configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.common]
+sources = [
+  {path = "common",      mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "common-only", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.ghostty.profiles.macbook]
+sources = [
+  {path = "common", mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "macbook", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+root = "nvim-custom"
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+
+[packages.folder-overlay-pkg]
+description = "Package with two folder-mode sources targeting same path (invalid)"
+supported_os = ["linux", "darwin"]
+
+[packages.folder-overlay-pkg.profiles.common]
+sources = [
+  {path = "cfg1", mode = "folder", target = "$HOME/.config/myfolder"},
+  {path = "cfg2", mode = "folder", target = "$HOME/.config/myfolder"},
+]

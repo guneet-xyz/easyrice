@@ -2,11 +2,14 @@ package installer
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"go.uber.org/zap"
 
 	"github.com/guneet-xyz/easyrice/internal/logger"
+	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/plan"
+	"github.com/guneet-xyz/easyrice/internal/profile"
 	"github.com/guneet-xyz/easyrice/internal/state"
 )
 
@@ -67,10 +70,25 @@ func BuildSwitchPlan(req SwitchRequest) (*SwitchPlan, error) {
 	// BuildInstallPlan internally calls DetectConflicts(planned, nil), so it may
 	// return an error if old links would conflict. We re-run conflict detection
 	// below with ignoreTargets to filter those out.
+	m, err := manifest.LoadFile(filepath.Join(req.RepoRoot, "rice.toml"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load manifest: %w", err)
+	}
+	pkg, ok := m.Packages[req.PackageName]
+	if !ok {
+		return nil, fmt.Errorf("package %q not found in manifest", req.PackageName)
+	}
+	specs, err := profile.ResolveSpecs(&pkg, req.PackageName, req.NewProfile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve profile %q: %w", req.NewProfile, err)
+	}
+
 	installPlan, installErr := BuildInstallPlan(InstallRequest{
 		RepoRoot:    req.RepoRoot,
 		PackageName: req.PackageName,
-		Profile:     req.NewProfile,
+		ProfileName: req.NewProfile,
+		Pkg:         &pkg,
+		Specs:       specs,
 		CurrentOS:   req.CurrentOS,
 		HomeDir:     req.HomeDir,
 		StatePath:   req.StatePath,

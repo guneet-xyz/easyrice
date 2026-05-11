@@ -14,16 +14,20 @@ import (
 	"github.com/guneet-xyz/easyrice/internal/logger"
 	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/plan"
-	"github.com/guneet-xyz/easyrice/internal/profile"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/symlink"
 )
 
 // InstallRequest captures all inputs needed to compute and execute an install.
+// The caller is responsible for loading the manifest, looking up the requested
+// PackageDef, performing the OS gate check, and resolving the profile to specs
+// BEFORE invoking BuildInstallPlan/Install.
 type InstallRequest struct {
 	RepoRoot    string
 	PackageName string
-	Profile     string
+	ProfileName string
+	Pkg         *manifest.PackageDef
+	Specs       []manifest.SourceSpec
 	CurrentOS   string
 	HomeDir     string
 	StatePath   string
@@ -60,32 +64,13 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	logger.Debug("BuildInstallPlan: start",
 		zap.String("repoRoot", req.RepoRoot),
 		zap.String("package", req.PackageName),
-		zap.String("profile", req.Profile),
 		zap.String("os", req.CurrentOS),
 	)
 
-	// 1. Discover manifests
-	manifests, err := manifest.Discover(req.RepoRoot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover manifests: %w", err)
+	if req.Pkg == nil {
+		return nil, fmt.Errorf("install request: Pkg must not be nil for package %q", req.PackageName)
 	}
-
-	// 2. Find the requested package
-	m, ok := manifests[req.PackageName]
-	if !ok {
-		return nil, fmt.Errorf("package %q not found in %s", req.PackageName, req.RepoRoot)
-	}
-
-	// 3. OS gate
-	if err := manifest.CheckOS(m, req.CurrentOS); err != nil {
-		return nil, err
-	}
-
-	// 4. Resolve profile to source spec list
-	specs, err := profile.ResolveSpecs(m, req.Profile)
-	if err != nil {
-		return nil, err
-	}
+	specs := req.Specs
 
 	sourcePaths := make([]string, len(specs))
 	for i, s := range specs {
@@ -93,7 +78,6 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	}
 	logger.Info("Building install plan",
 		zap.String("package", req.PackageName),
-		zap.String("profile", req.Profile),
 		zap.Strings("sources", sourcePaths),
 	)
 
@@ -115,7 +99,11 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	var folderOps []folderOrigin
 
 	for _, spec := range specs {
-		sourceDir := filepath.Join(req.RepoRoot, req.PackageName, spec.Path)
+		packageRoot := req.Pkg.Root
+		if packageRoot == "" {
+			packageRoot = req.PackageName
+		}
+		sourceDir := filepath.Join(req.RepoRoot, packageRoot, spec.Path)
 		fi, err := os.Stat(sourceDir)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -236,7 +224,7 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	// 8. Build plan
 	p := &plan.Plan{
 		PackageName: req.PackageName,
-		Profile:     req.Profile,
+		Profile:     req.ProfileName,
 	}
 	for _, op := range ops {
 		p.Ops = append(p.Ops, plan.Op{

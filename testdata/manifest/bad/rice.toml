@@ -1,8 +1,0 @@
-schema_version = 99
-name = "bad"
-description = "Invalid manifest"
-supported_os = ["linux"]
-profile_key = "os"
-
-[profiles.default]
-sources = [{path = "common", mode = "file", target = "$HOME/.config/bad"}]

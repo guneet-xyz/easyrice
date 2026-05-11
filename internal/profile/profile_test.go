@@ -12,7 +12,8 @@ import (
 func TestResolveSpecs(t *testing.T) {
 	tests := []struct {
 		name        string
-		manifest    *manifest.Manifest
+		pkg         *manifest.PackageDef
+		pkgName     string
 		profileName string
 		want        []manifest.SourceSpec
 		wantErr     bool
@@ -20,22 +21,21 @@ func TestResolveSpecs(t *testing.T) {
 	}{
 		{
 			name: "single source",
-			manifest: &manifest.Manifest{
-				Name: "nvim",
+			pkg: &manifest.PackageDef{
 				Profiles: map[string]manifest.ProfileDef{
 					"default": {
 						Sources: []manifest.SourceSpec{{Path: ".", Mode: "file", Target: "$HOME"}},
 					},
 				},
 			},
+			pkgName:     "nvim",
 			profileName: "default",
 			want:        []manifest.SourceSpec{{Path: ".", Mode: "file", Target: "$HOME"}},
 			wantErr:     false,
 		},
 		{
 			name: "multiple sources in order",
-			manifest: &manifest.Manifest{
-				Name: "ghostty",
+			pkg: &manifest.PackageDef{
 				Profiles: map[string]manifest.ProfileDef{
 					"macbook": {
 						Sources: []manifest.SourceSpec{
@@ -45,6 +45,7 @@ func TestResolveSpecs(t *testing.T) {
 					},
 				},
 			},
+			pkgName:     "ghostty",
 			profileName: "macbook",
 			want: []manifest.SourceSpec{
 				{Path: "common", Mode: "file", Target: "$HOME"},
@@ -54,8 +55,7 @@ func TestResolveSpecs(t *testing.T) {
 		},
 		{
 			name: "unknown profile with available profiles",
-			manifest: &manifest.Manifest{
-				Name: "nvim",
+			pkg: &manifest.PackageDef{
 				Profiles: map[string]manifest.ProfileDef{
 					"default": {
 						Sources: []manifest.SourceSpec{{Path: ".", Mode: "file", Target: "$HOME"}},
@@ -65,6 +65,7 @@ func TestResolveSpecs(t *testing.T) {
 					},
 				},
 			},
+			pkgName:     "nvim",
 			profileName: "unknown",
 			want:        nil,
 			wantErr:     true,
@@ -72,8 +73,7 @@ func TestResolveSpecs(t *testing.T) {
 		},
 		{
 			name: "preserves source order",
-			manifest: &manifest.Manifest{
-				Name: "zsh",
+			pkg: &manifest.PackageDef{
 				Profiles: map[string]manifest.ProfileDef{
 					"work": {
 						Sources: []manifest.SourceSpec{
@@ -84,6 +84,7 @@ func TestResolveSpecs(t *testing.T) {
 					},
 				},
 			},
+			pkgName:     "zsh",
 			profileName: "work",
 			want: []manifest.SourceSpec{
 				{Path: "base", Mode: "file", Target: "$HOME"},
@@ -96,7 +97,7 @@ func TestResolveSpecs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResolveSpecs(tt.manifest, tt.profileName)
+			got, err := ResolveSpecs(tt.pkg, tt.pkgName, tt.profileName)
 
 			if tt.wantErr {
 				require.Error(t, err)

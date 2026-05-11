@@ -10,7 +10,6 @@ import (
 )
 
 func resetRootCmd() {
-	flagRepo = "."
 	flagState = ""
 	flagLogLevel = ""
 	flagYes = false
@@ -48,7 +47,6 @@ func TestHelpContainsFlags(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "--log-level")
 	assert.Contains(t, output, "--yes")
-	assert.Contains(t, output, "--repo")
 	assert.Contains(t, output, "--state")
 }
 

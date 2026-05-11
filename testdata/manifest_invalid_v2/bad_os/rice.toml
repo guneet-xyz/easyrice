@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.badpkg]
+description = "Package with invalid OS"
+supported_os = ["haiku"]
+
+[packages.badpkg.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME/.config/badpkg"}]

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/guneet-xyz/easyrice/internal/doctor"
+	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/symlink"
 )
@@ -24,6 +25,20 @@ func init() {
 func runDoctor(cmd *cobra.Command, args []string) error {
 	out := cmd.OutOrStdout()
 	issues := 0
+
+	if err := doctor.CheckGitOnPath(); err != nil {
+		fmt.Fprintf(out, "[ERROR] %v\n", err)
+		issues++
+	} else {
+		fmt.Fprintln(out, "[OK] git available")
+	}
+
+	if err := doctor.CheckRepoInitialized(repo.DefaultRepoPath()); err != nil {
+		fmt.Fprintf(out, "[ERROR] %v\n", err)
+		issues++
+	} else {
+		fmt.Fprintln(out, "[OK] repo initialized")
+	}
 
 	doctor.CheckLegacyState(out)
 
@@ -45,13 +60,6 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			} else {
 				fmt.Fprintf(out, "[ERROR] %s: symlink replaced %s (expected -> %s)\n", pkgName, link.Target, link.Source)
 			}
-			issues++
-		}
-	}
-
-	if flagRepo != "." {
-		if _, err := os.Stat(flagRepo); err != nil {
-			fmt.Fprintf(out, "[ERROR] Repo directory not accessible: %s\n", flagRepo)
 			issues++
 		}
 	}

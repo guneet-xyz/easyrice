@@ -1,15 +1,15 @@
 # internal/manifest/
 
-`rice.toml` parsing, validation, and OS gating. Schema definitions live here.
+Single-file root `rice.toml` parsing, validation, and OS gating. Schema definitions live here.
 
 ## STRUCTURE
 
 ```
 internal/manifest/
-├── schema.go       # Manifest, ProfileDef, SourceSpec + SourceSpec.UnmarshalTOML
-├── load.go         # Load(dir) parse+validate single package / Discover(repoRoot) scan all
+├── schema.go       # Manifest, PackageDef, ProfileDef, SourceSpec + SourceSpec.UnmarshalTOML
+├── load.go         # LoadFile(path) - parse + validate the root rice.toml
 ├── validate.go     # Validate(*Manifest) - semantic checks beyond TOML decode
-├── osgating.go     # CheckOS(*Manifest, currentOS) - package-level OS gate
+├── osgating.go     # CheckOS(*PackageDef, currentOS) - package-level OS gate
 └── *_test.go
 ```
 
@@ -25,20 +25,22 @@ internal/manifest/
 
 ## CONTRACT
 
-- `Load(dir)` reads `<dir>/rice.toml`, parses, validates. Returns `(*Manifest, error)`. NEVER returns a partially-valid manifest.
-- `Discover(repoRoot)` scans direct children of `repoRoot` (one level deep ONLY). Silently skips dirs with no `rice.toml`. Returns first parse/validate error encountered.
+- `LoadFile(path)` reads the file at `path` (typically `repo.RepoTomlPath(repoRoot)`), parses, validates. Returns `(*Manifest, error)`. NEVER returns a partially-valid manifest.
+- The single root `rice.toml` declares ALL packages under `[packages.<name>]` tables.
+- `PackageDef.Root` is optional; when empty, callers MUST default it to the package name. The manifest layer does NOT mutate it.
 - `SourceSpec.UnmarshalTOML` accepts ONLY the inline table form `{path=..., mode=..., target=...}`. Bare strings or other shapes → error. All three fields required.
 - `CheckOS` returns nil if `currentOS` is in `supported_os`, else descriptive error. Empty `supported_os` is rejected by `Validate`.
 
 ## CONVENTIONS
 
 - Use `BurntSushi/toml` (already in go.mod). Do not switch decoders.
-- Validation errors should name the offending field: `fmt.Errorf("profiles.%s.sources[%d]: ...", name, i)`.
+- Validation errors should name the offending field: `fmt.Errorf("packages.%s.profiles.%s.sources[%d]: ...", pkg, profile, i)`.
 - Keep `schema.go` as data-only. All semantics → `validate.go`.
 
 ## ANTI-PATTERNS
 
+- DO NOT reintroduce `Discover()` - it has been deleted. The single-file manifest model means there is nothing to discover. Use `LoadFile(repo.RepoTomlPath(repoRoot))`.
+- DO NOT scan subdirectories looking for nested `rice.toml` files - by design there is exactly one.
 - DO NOT relax `SourceSpec.UnmarshalTOML` to accept bare strings - the table form is intentional and documented.
-- DO NOT silently default missing fields - return an error pointing at the field path.
-- DO NOT walk deeper than one level in `Discover` - packages are direct children of the repo root, by spec.
+- DO NOT silently default missing fields (other than `PackageDef.Root` which is documented optional and resolved at the call site).
 - DO NOT introduce schema changes without bumping `schema_version` and updating `Validate` to reject older versions.

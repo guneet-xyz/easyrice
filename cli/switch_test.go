@@ -12,7 +12,6 @@ import (
 func installCommonForSwitch(t *testing.T, repoRoot, statePath string) {
 	t.Helper()
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "mypkg",
@@ -28,7 +27,6 @@ func TestSwitch_WithYesFlag(t *testing.T) {
 
 	resetInstallFlags()
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"switch", "mypkg", "macbook",
@@ -52,7 +50,6 @@ func TestSwitch_StdinYesProceeds(t *testing.T) {
 
 	resetInstallFlags()
 	out, err := runInstallCmd(t, "y\n",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"switch", "mypkg", "macbook",
 	)
@@ -71,7 +68,6 @@ func TestSwitch_StdinNoAborts(t *testing.T) {
 
 	resetInstallFlags()
 	out, err := runInstallCmd(t, "n\n",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"switch", "mypkg", "macbook",
 	)
@@ -113,7 +109,6 @@ func TestSwitch_ShowsConflictDetails(t *testing.T) {
 
 	resetInstallFlags()
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"switch", "mypkg", "macbook",
@@ -125,10 +120,9 @@ func TestSwitch_ShowsConflictDetails(t *testing.T) {
 
 func TestSwitch_NotInstalledErrors(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, _ := setupTestRepo(t)
+	_, statePath, _ := setupTestRepo(t)
 
 	_, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"switch", "notinstalled", "macbook",
@@ -138,10 +132,9 @@ func TestSwitch_NotInstalledErrors(t *testing.T) {
 
 func TestSwitch_FolderModeToFileMode(t *testing.T) {
 	resetInstallFlags()
-	repoRoot, statePath, homeDir := setupFolderTestRepo(t)
+	_, statePath, homeDir := setupFolderTestRepo(t)
 
 	out, err := runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"install", "folderpkg",
@@ -156,7 +149,6 @@ func TestSwitch_FolderModeToFileMode(t *testing.T) {
 
 	resetInstallFlags()
 	out, err = runInstallCmd(t, "",
-		"--repo", repoRoot,
 		"--state", statePath,
 		"--yes",
 		"switch", "folderpkg", "filemode",

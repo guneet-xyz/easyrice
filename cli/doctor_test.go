@@ -9,11 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
 )
 
+func setupDoctorRepo(t *testing.T) {
+	t.Helper()
+	setIsolatedHome(t)
+	require.NoError(t, os.MkdirAll(repo.DefaultRepoPath(), 0o755))
+}
+
 func TestDoctor_NoStateFile(t *testing.T) {
 	resetInstallFlags()
+	setupDoctorRepo(t)
 	tmp := t.TempDir()
 	statePath := filepath.Join(tmp, "missing-state.json")
 
@@ -27,6 +35,7 @@ func TestDoctor_NoStateFile(t *testing.T) {
 
 func TestDoctor_HealthyPackage(t *testing.T) {
 	resetInstallFlags()
+	setupDoctorRepo(t)
 	tmp := t.TempDir()
 	statePath := filepath.Join(tmp, "state.json")
 
@@ -54,6 +63,7 @@ func TestDoctor_HealthyPackage(t *testing.T) {
 
 func TestDoctor_MissingSymlink(t *testing.T) {
 	resetInstallFlags()
+	setupDoctorRepo(t)
 	tmp := t.TempDir()
 	statePath := filepath.Join(tmp, "state.json")
 
@@ -82,6 +92,7 @@ func TestDoctor_MissingSymlink(t *testing.T) {
 
 func TestDoctor_ReplacedSymlink(t *testing.T) {
 	resetInstallFlags()
+	setupDoctorRepo(t)
 	tmp := t.TempDir()
 	statePath := filepath.Join(tmp, "state.json")
 
@@ -108,19 +119,33 @@ func TestDoctor_ReplacedSymlink(t *testing.T) {
 	assert.Contains(t, out, "mypkg")
 }
 
-func TestDoctor_NonexistentRepo(t *testing.T) {
+func TestDoctor_RepoMissing(t *testing.T) {
 	resetInstallFlags()
+	setIsolatedHome(t)
 	tmp := t.TempDir()
 	statePath := filepath.Join(tmp, "state.json")
-	missingRepo := filepath.Join(tmp, "does-not-exist")
 
 	out, err := runInstallCmd(t, "",
 		"--state", statePath,
-		"--repo", missingRepo,
 		"doctor",
 	)
 	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, out, "rice init")
 	assert.Contains(t, out, "[ERROR]")
-	assert.Contains(t, out, "Repo directory not accessible")
-	assert.Contains(t, out, missingRepo)
+}
+
+func TestDoctor_AllPass(t *testing.T) {
+	resetInstallFlags()
+	setupDoctorRepo(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[OK] git available")
+	assert.Contains(t, out, "[OK] repo initialized")
+	assert.Contains(t, out, "All checks passed.")
 }

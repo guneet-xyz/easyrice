@@ -9,6 +9,7 @@ import (
 
 	"github.com/guneet-xyz/easyrice/internal/installer"
 	"github.com/guneet-xyz/easyrice/internal/prompt"
+	"github.com/guneet-xyz/easyrice/internal/repo"
 )
 
 var switchCmd = &cobra.Command{
@@ -32,7 +33,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 	}
 
 	req := installer.SwitchRequest{
-		RepoRoot:    flagRepo,
+		RepoRoot:    repo.DefaultRepoPath(),
 		PackageName: pkg,
 		NewProfile:  newProfile,
 		CurrentOS:   runtime.GOOS,

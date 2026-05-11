@@ -11,17 +11,17 @@ import (
 // ResolveSpecs returns the ordered list of SourceSpec entries for the given
 // profile name, preserving Mode and Target fields needed for folder-mode
 // installs.
-func ResolveSpecs(m *manifest.Manifest, profileName string) ([]manifest.SourceSpec, error) {
-	profile, exists := m.Profiles[profileName]
+func ResolveSpecs(pkg *manifest.PackageDef, pkgName, profileName string) ([]manifest.SourceSpec, error) {
+	profile, exists := pkg.Profiles[profileName]
 	if !exists {
-		available := make([]string, 0, len(m.Profiles))
-		for name := range m.Profiles {
+		available := make([]string, 0, len(pkg.Profiles))
+		for name := range pkg.Profiles {
 			available = append(available, name)
 		}
 		sort.Strings(available)
 
 		availableStr := strings.Join(available, ", ")
-		return nil, fmt.Errorf("profile %q not defined in package %q; available: %s", profileName, m.Name, availableStr)
+		return nil, fmt.Errorf("profile %q not defined in package %q; available: %s", profileName, pkgName, availableStr)
 	}
 
 	specs := make([]manifest.SourceSpec, len(profile.Sources))

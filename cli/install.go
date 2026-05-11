@@ -8,7 +8,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/guneet-xyz/easyrice/internal/installer"
+	"github.com/guneet-xyz/easyrice/internal/manifest"
+	"github.com/guneet-xyz/easyrice/internal/profile"
 	"github.com/guneet-xyz/easyrice/internal/prompt"
+	"github.com/guneet-xyz/easyrice/internal/repo"
 )
 
 var installCmd = &cobra.Command{
@@ -26,7 +29,35 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	pkg := args[0]
+	pkgName := args[0]
+
+	repoRoot := repo.DefaultRepoPath()
+	exists, err := repo.Exists(repoRoot)
+	if err != nil {
+		return fmt.Errorf("check repo: %w", err)
+	}
+	if !exists {
+		return repo.ErrRepoNotInitialized
+	}
+
+	mf, err := manifest.LoadFile(repo.RepoTomlPath(repoRoot))
+	if err != nil {
+		return fmt.Errorf("load manifest: %w", err)
+	}
+
+	pkgDef, ok := mf.Packages[pkgName]
+	if !ok {
+		return repo.ErrPackageNotDeclared(pkgName)
+	}
+
+	if err := manifest.CheckOS(pkgName, &pkgDef, runtime.GOOS); err != nil {
+		return fmt.Errorf("os check: %w", err)
+	}
+
+	specs, err := profile.ResolveSpecs(&pkgDef, pkgName, flagProfile)
+	if err != nil {
+		return fmt.Errorf("resolve profile: %w", err)
+	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -34,9 +65,11 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	req := installer.InstallRequest{
-		RepoRoot:    flagRepo,
-		PackageName: pkg,
-		Profile:     flagProfile,
+		RepoRoot:    repoRoot,
+		PackageName: pkgName,
+		ProfileName: flagProfile,
+		Pkg:         &pkgDef,
+		Specs:       specs,
 		CurrentOS:   runtime.GOOS,
 		HomeDir:     home,
 		StatePath:   flagState,

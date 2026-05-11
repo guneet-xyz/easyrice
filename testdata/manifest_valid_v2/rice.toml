@@ -1,0 +1,22 @@
+schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal emulator configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/ghostty"}]
+
+[packages.ghostty.profiles.macbook]
+sources = [
+  {path = "common", mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "macbook", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+root = "nvim-custom"
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]

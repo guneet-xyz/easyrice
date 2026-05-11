@@ -8,6 +8,8 @@
 cli/
 ├── main.go               # func main() { Execute() }
 ├── root.go               # rootCmd + persistent flags + PersistentPreRunE (logger.Init)
+├── init.go               # easyrice init <git-url>  (clone repo into managed location)
+├── update.go             # easyrice update          (git pull on managed repo)
 ├── install.go            # easyrice install <pkg> --profile <name>
 ├── uninstall.go          # easyrice uninstall <pkg>
 ├── switch.go             # easyrice switch <pkg> --profile <name>
@@ -24,20 +26,25 @@ cli/
 | Add new command | new `<name>.go`, define `var <name>Cmd = &cobra.Command{...}`, register in `init()` via `rootCmd.AddCommand(<name>Cmd)` |
 | Change persistent flag default | `cli/root.go` `init()` |
 | Change persistent pre-run (logger setup) | `cli/root.go` `PersistentPreRunE` |
+| Change clone behavior | `cli/init.go` (delegates to `internal/repo.Clone`) |
+| Change pull behavior | `cli/update.go` (delegates to `internal/repo.Pull`) |
 | Bump CLI version string | `cli/root.go` `const Version` |
 
 ## CONVENTIONS
 
 - Each command file owns: `var <name>Cmd`, command-local flags, `init()`, `run<Name>(cmd, args)`.
-- Commands MUST delegate work to `internal/installer` (or other internal pkgs). NO business logic in `cli/`.
-- Read persistent flag values via the package-level vars in `root.go` (`flagRepo`, `flagState`, `flagYes`). Don't redeclare.
+- Commands MUST delegate work to `internal/installer` or `internal/repo` (or other internal pkgs). NO business logic in `cli/`.
+- Read persistent flag values via the package-level vars in `root.go` (`flagState`, `flagYes`). There is NO `flagRepo` - the repo path is fixed via `repo.DefaultRepoPath()`.
 - For interactive y/n: call `prompt.Confirm()`; respect `flagYes` to bypass.
 - Render plans via `prompt.RenderPlan` / `RenderSwitchPlan` / `RenderConflicts` BEFORE executing.
 - Errors from `runX` propagate to cobra → exit 1 via `Execute()` in `root.go`.
+- `install`/`uninstall`/`switch`/`status` MUST check `repo.Exists(repo.DefaultRepoPath())` and return `repo.ErrRepoNotInitialized` if missing.
 
 ## ANTI-PATTERNS
 
 - DO NOT call `os.Exit` inside command bodies - return error, let `Execute()` handle it.
-- DO NOT touch the filesystem here beyond what `installer`/`state` exposes.
+- DO NOT touch the filesystem here beyond what `installer`/`repo`/`state` exposes.
 - DO NOT initialize the logger anywhere except `PersistentPreRunE` in `root.go`.
 - DO NOT add commands without a `_test.go` file alongside.
+- DO NOT reintroduce a `--repo` flag - the managed-repo path is fixed.
+- DO NOT call `exec.Command("git", ...)` - all git ops go through `internal/repo`.
