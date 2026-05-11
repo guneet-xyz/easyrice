@@ -4,6 +4,7 @@
 # Go build artifacts
 *.test
 *.out
+coverage.html
 vendor/
 
 # OS artifacts

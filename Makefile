@@ -1,17 +1,19 @@
-.PHONY: help build install test vet fmt clean
+.PHONY: help build install test vet fmt clean coverage coverage-check
 
 # Default target
 help:
 	@echo "easyrice - Go CLI dotfile manager"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make build    - Compile binary to ./easyrice"
-	@echo "  make install  - Install binary to \$$(GOPATH)/bin/easyrice and create rice symlink"
-	@echo "  make test     - Run tests with race detector"
-	@echo "  make vet      - Run go vet"
-	@echo "  make fmt      - Format code with gofmt"
-	@echo "  make clean    - Remove local ./easyrice binary"
-	@echo "  make help     - Show this message"
+	@echo "  make build           - Compile binary to ./easyrice"
+	@echo "  make install         - Install binary to \$$(GOPATH)/bin/easyrice and create rice symlink"
+	@echo "  make test            - Run tests with race detector"
+	@echo "  make vet             - Run go vet"
+	@echo "  make fmt             - Format code with gofmt"
+	@echo "  make coverage        - Generate coverage report"
+	@echo "  make coverage-check  - Validate coverage thresholds"
+	@echo "  make clean           - Remove local ./easyrice binary"
+	@echo "  make help            - Show this message"
 
 # GOPATH configuration with fallback
 GOPATH   ?= $(shell go env GOPATH)
@@ -43,3 +45,12 @@ fmt:
 # Clean local binary
 clean:
 	rm -f easyrice
+
+# Generate coverage report
+coverage:
+	go test -race -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+
+# Check coverage thresholds
+coverage-check: coverage
+	./scripts/coverage-check.sh coverage.out
