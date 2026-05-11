@@ -119,6 +119,14 @@ func requireDarwinDeps(t *testing.T) {
 	}
 }
 
+// requireLinuxDeps skips on non-linux: for linux-specific registry install tests.
+func requireLinuxDeps(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skipf("requires linux; GOOS=%s", runtime.GOOS)
+	}
+}
+
 func ensureLinuxOrDarwin(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
@@ -140,6 +148,50 @@ func TestE2E_InstallWithDeps(t *testing.T) {
 			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 1}},
 			{Argv: []string{"myformat", "--version"}, Result: deps.RunResult{ExitCode: 1}},
 			{Argv: []string{"brew", "install", "ripgrep"}, Result: deps.RunResult{ExitCode: 0}},
+			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
+			{Argv: []string{"sh", "-c", "pip install myformat"}, Result: deps.RunResult{ExitCode: 0}},
+			{Argv: []string{"myformat", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("myformat 1.0.0\n")}},
+		},
+	}
+	withMockRunner(t, mock)
+	withStdin(t, "y\n")
+
+	out, err := runE2ECmd(t,
+		"--state", statePath,
+		"--yes",
+		"install", "nvim",
+		"--profile", "default",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	s, err := state.Load(statePath)
+	require.NoError(t, err)
+	pkg, ok := s["nvim"]
+	require.True(t, ok, "nvim should be in state")
+	assert.Equal(t, "default", pkg.Profile)
+
+	link := filepath.Join(homeDir, ".config", "nvim")
+	fi, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&os.ModeSymlink, "expected nvim symlink at %s", link)
+
+	assert.Equal(t, len(mock.Expectations), len(mock.Calls), "all mock calls consumed")
+}
+
+func TestE2E_InstallWithDeps_Linux(t *testing.T) {
+	requireLinuxDeps(t)
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	repoRoot, statePath, homeDir := setupE2ERepo(t)
+	installDepsFixture(t, repoRoot)
+
+	mock := &deps.MockRunner{
+		Expectations: []deps.MockExpectation{
+			{Argv: []string{"nvim", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("NVIM v0.10.0\n")}},
+			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 1}},
+			{Argv: []string{"myformat", "--version"}, Result: deps.RunResult{ExitCode: 1}},
+			{Argv: []string{"apt-get", "install", "-y", "ripgrep"}, Result: deps.RunResult{ExitCode: 0}},
 			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
 			{Argv: []string{"sh", "-c", "pip install myformat"}, Result: deps.RunResult{ExitCode: 0}},
 			{Argv: []string{"myformat", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("myformat 1.0.0\n")}},
@@ -265,6 +317,69 @@ sources = [{path = "full", mode = "file", target = "$HOME/.config/demo"}]
 			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
 			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 1}},
 			{Argv: []string{"brew", "install", "ripgrep"}, Result: deps.RunResult{ExitCode: 0}},
+			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
+		},
+	}
+	withMockRunner(t, mock)
+
+	out, err := runE2ECmd(t,
+		"--state", statePath,
+		"--yes",
+		"install", "demo",
+		"--profile", "minimal",
+	)
+	require.NoError(t, err, "initial install failed: out=%s", out)
+	require.Equal(t, 1, len(mock.Calls), "initial install: only ripgrep probe")
+
+	resetInstallFlags()
+	out, err = runE2ECmd(t,
+		"--state", statePath,
+		"--yes",
+		"switch", "demo", "full",
+	)
+	require.NoError(t, err, "switch failed: out=%s", out)
+
+	assert.Equal(t, len(mock.Expectations), len(mock.Calls),
+		"switch must re-evaluate deps (probe+install+post-probe)")
+
+	s, err := state.Load(statePath)
+	require.NoError(t, err)
+	pkg, ok := s["demo"]
+	require.True(t, ok)
+	assert.Equal(t, "full", pkg.Profile, "switch must update profile in state")
+}
+
+func TestE2E_SwitchReEvalsDeps_Linux(t *testing.T) {
+	requireLinuxDeps(t)
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	repoRoot, statePath, _ := setupE2ERepo(t)
+
+	manifest := `schema_version = 1
+
+[packages.demo]
+description = "Demo"
+supported_os = ["linux", "darwin"]
+dependencies = [
+  {name = "ripgrep"},
+]
+
+[packages.demo.profiles.minimal]
+sources = [{path = "minimal", mode = "file", target = "$HOME/.config/demo"}]
+
+[packages.demo.profiles.full]
+sources = [{path = "full", mode = "file", target = "$HOME/.config/demo"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
+	writeRepoFile(t, repoRoot, "demo/minimal/demo.cfg", "minimal\n")
+	writeRepoFile(t, repoRoot, "demo/full/demo.cfg", "full\n")
+
+	mock := &deps.MockRunner{
+		Expectations: []deps.MockExpectation{
+			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
+			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 1}},
+			{Argv: []string{"apt-get", "install", "-y", "ripgrep"}, Result: deps.RunResult{ExitCode: 0}},
 			{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
 		},
 	}
