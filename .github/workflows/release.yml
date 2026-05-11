@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name || inputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build cross-platform binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          LDFLAGS="-s -w -X main.Version=${VERSION}"
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            GOOS="${t%/*}"
+            GOARCH="${t#*/}"
+            EXT=""
+            [ "$GOOS" = "windows" ] && EXT=".exe"
+            name="easyrice-${VERSION}-${GOOS}-${GOARCH}${EXT}"
+            echo "Building $name"
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+              go build -trimpath -ldflags "$LDFLAGS" -o "dist/${name}" ./cli
+          done
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum easyrice-* > checksums.txt
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${VERSION}" >/dev/null 2>&1 || \
+            gh release create "${VERSION}" --title "${VERSION}" --generate-notes
+          gh release upload "${VERSION}" dist/* --clobber
