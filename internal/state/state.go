@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/guneet-xyz/easyrice/internal/deps"
 )
 
 // InstalledLink represents a single symlink installed by rice.
@@ -17,9 +19,10 @@ type InstalledLink struct {
 
 // PackageState represents the state of a single installed package.
 type PackageState struct {
-	Profile        string          `json:"profile"`
-	InstalledLinks []InstalledLink `json:"installed_links"`
-	InstalledAt    time.Time       `json:"installed_at"`
+	Profile                string                    `json:"profile"`
+	InstalledLinks         []InstalledLink           `json:"installed_links"`
+	InstalledAt            time.Time                 `json:"installed_at"`
+	InstalledDependencies  []deps.InstalledDependency `json:"installed_dependencies,omitempty"`
 }
 
 // State is the top-level state file structure.

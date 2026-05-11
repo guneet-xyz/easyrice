@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -315,4 +316,83 @@ func TestLoadErrorOnReadFailure(t *testing.T) {
 
 	_, err := Load(statePath)
 	assert.Error(t, err, "Load should error when file cannot be read due to permissions")
+}
+
+func TestLoadLegacyStateWithoutInstalledDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Create legacy state JSON without installed_dependencies field
+	legacyJSON := `{
+  "nvim": {
+    "profile": "default",
+    "installed_links": [
+      {
+        "source": "/home/user/rice/nvim/init.lua",
+        "target": "/home/user/.config/nvim/init.lua"
+      }
+    ],
+    "installed_at": "2024-01-01T12:00:00Z"
+  }
+}`
+
+	require.NoError(t, os.WriteFile(statePath, []byte(legacyJSON), 0644))
+
+	// Load legacy state
+	loaded, err := Load(statePath)
+	assert.NoError(t, err, "Load should not error on legacy state without installed_dependencies")
+	assert.NotNil(t, loaded)
+	assert.Equal(t, "default", loaded["nvim"].Profile)
+	assert.Nil(t, loaded["nvim"].InstalledDependencies, "InstalledDependencies should be nil for legacy state")
+}
+
+func TestRoundTripWithInstalledDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	depTime := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC)
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt: now,
+			InstalledDependencies: []deps.InstalledDependency{
+				{
+					Name:              "neovim",
+					Version:           "0.9.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+				{
+					Name:              "ripgrep",
+					Version:           "13.0.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+			},
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify equality
+	assert.Equal(t, originalState, loadedState)
+	assert.Len(t, loadedState["nvim"].InstalledDependencies, 2)
+	assert.Equal(t, "neovim", loadedState["nvim"].InstalledDependencies[0].Name)
+	assert.Equal(t, "ripgrep", loadedState["nvim"].InstalledDependencies[1].Name)
 }
