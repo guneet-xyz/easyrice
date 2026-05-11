@@ -66,6 +66,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	if issues == 0 {
 		fmt.Fprintln(out, "All checks passed.")
+		maybePrintUpdateReminder()
 		return nil
 	}
 	fmt.Fprintf(out, "\n%d issue(s) found.\n", issues)
