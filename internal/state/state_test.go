@@ -396,3 +396,234 @@ func TestRoundTripWithInstalledDependencies(t *testing.T) {
 	assert.Equal(t, "neovim", loadedState["nvim"].InstalledDependencies[0].Name)
 	assert.Equal(t, "ripgrep", loadedState["nvim"].InstalledDependencies[1].Name)
 }
+
+func TestRoundTripWithEmptyInstalledDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt:           now,
+			InstalledDependencies: []deps.InstalledDependency{}, // empty slice
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify that empty slice round-trips
+	assert.Len(t, loadedState["nvim"].InstalledDependencies, 0)
+}
+
+func TestRoundTripWithNilInstalledDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt:           now,
+			InstalledDependencies: nil, // nil slice
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify equality - nil slice should round-trip correctly
+	assert.Equal(t, originalState, loadedState)
+	assert.Nil(t, loadedState["nvim"].InstalledDependencies)
+}
+
+func TestRoundTripWithMultipleDependenciesPerPackage(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	depTime := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC)
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt: now,
+			InstalledDependencies: []deps.InstalledDependency{
+				{
+					Name:              "neovim",
+					Version:           "0.9.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+				{
+					Name:              "ripgrep",
+					Version:           "13.0.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+				{
+					Name:              "fd",
+					Version:           "9.0.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: false,
+				},
+				{
+					Name:              "fzf",
+					Version:           "0.40.0",
+					Method:            "custom",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+			},
+		},
+		"ghostty": PackageState{
+			Profile: "minimal",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/ghostty/config",
+					Target: "/home/user/.config/ghostty/config",
+				},
+			},
+			InstalledAt: now,
+			InstalledDependencies: []deps.InstalledDependency{
+				{
+					Name:              "ghostty",
+					Version:           "1.0.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+			},
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify equality
+	assert.Equal(t, originalState, loadedState)
+
+	// Verify nvim dependencies
+	assert.Len(t, loadedState["nvim"].InstalledDependencies, 4)
+	assert.Equal(t, "neovim", loadedState["nvim"].InstalledDependencies[0].Name)
+	assert.Equal(t, "ripgrep", loadedState["nvim"].InstalledDependencies[1].Name)
+	assert.Equal(t, "fd", loadedState["nvim"].InstalledDependencies[2].Name)
+	assert.Equal(t, "fzf", loadedState["nvim"].InstalledDependencies[3].Name)
+
+	// Verify ghostty dependencies
+	assert.Len(t, loadedState["ghostty"].InstalledDependencies, 1)
+	assert.Equal(t, "ghostty", loadedState["ghostty"].InstalledDependencies[0].Name)
+
+	// Verify ManagedByEasyrice field is preserved
+	assert.True(t, loadedState["nvim"].InstalledDependencies[0].ManagedByEasyrice)
+	assert.False(t, loadedState["nvim"].InstalledDependencies[2].ManagedByEasyrice)
+}
+
+func TestRoundTripWithMixedPackages(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	depTime := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC)
+
+	originalState := State{
+		"nvim": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/nvim/init.lua",
+					Target: "/home/user/.config/nvim/init.lua",
+				},
+			},
+			InstalledAt: now,
+			InstalledDependencies: []deps.InstalledDependency{
+				{
+					Name:              "neovim",
+					Version:           "0.9.0",
+					Method:            "apt",
+					InstalledAt:       depTime,
+					ManagedByEasyrice: true,
+				},
+			},
+		},
+		"ghostty": PackageState{
+			Profile: "minimal",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/ghostty/config",
+					Target: "/home/user/.config/ghostty/config",
+				},
+			},
+			InstalledAt:           now,
+			InstalledDependencies: nil,
+		},
+		"zsh": PackageState{
+			Profile: "default",
+			InstalledLinks: []InstalledLink{
+				{
+					Source: "/home/user/rice/zsh/rc",
+					Target: "/home/user/.zshrc",
+				},
+			},
+			InstalledAt:           now,
+			InstalledDependencies: []deps.InstalledDependency{},
+		},
+	}
+
+	// Save
+	err := Save(statePath, originalState)
+	require.NoError(t, err)
+
+	// Load
+	loadedState, err := Load(statePath)
+	require.NoError(t, err)
+
+	// Verify nvim has dependencies
+	assert.Len(t, loadedState["nvim"].InstalledDependencies, 1)
+	assert.Equal(t, "neovim", loadedState["nvim"].InstalledDependencies[0].Name)
+
+	// Verify ghostty has nil dependencies
+	assert.Nil(t, loadedState["ghostty"].InstalledDependencies)
+
+	// Verify zsh has empty dependencies (JSON unmarshals empty array as nil)
+	assert.Len(t, loadedState["zsh"].InstalledDependencies, 0)
+}
