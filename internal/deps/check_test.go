@@ -328,3 +328,32 @@ func TestDepReport_NeedsAction(t *testing.T) {
 		})
 	}
 }
+
+func TestDepStatus_String(t *testing.T) {
+	t.Helper()
+
+	tests := []struct {
+		status   DepStatus
+		expected string
+	}{
+		{DepOK, "OK"},
+		{DepMissing, "Missing"},
+		{DepVersionMismatch, "VersionMismatch"},
+		{DepProbeUnknownVersion, "ProbeUnknownVersion"},
+		{DepStatus(999), "Unknown"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.expected, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.status.String())
+		})
+	}
+}
+
+func TestMatchVersion_InvalidVersion(t *testing.T) {
+	t.Helper()
+
+	_, err := MatchVersion("not-a-valid-version", ">=1.0.0")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid version")
+}
