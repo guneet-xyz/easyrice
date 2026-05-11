@@ -275,3 +275,73 @@ func TestFilterByPlatform(t *testing.T) {
 		})
 	}
 }
+
+func TestParseOSFromKey(t *testing.T) {
+	cases := []struct {
+		name string
+		key  string
+		want string
+	}{
+		// Valid OS prefixes
+		{
+			name: "linux prefix",
+			key:  "linux",
+			want: "linux",
+		},
+		{
+			name: "linux_debian",
+			key:  "linux_debian",
+			want: "linux",
+		},
+		{
+			name: "linux_ubuntu",
+			key:  "linux_ubuntu",
+			want: "linux",
+		},
+		{
+			name: "darwin",
+			key:  "darwin",
+			want: "darwin",
+		},
+		{
+			name: "windows",
+			key:  "windows",
+			want: "windows",
+		},
+		// Unknown/malformed cases
+		{
+			name: "empty string",
+			key:  "",
+			want: "",
+		},
+		{
+			name: "unknown_os",
+			key:  "unknown_os",
+			want: "",
+		},
+		{
+			name: "LINUX_DEBIAN uppercase",
+			key:  "LINUX_DEBIAN",
+			want: "",
+		},
+		{
+			name: "macos instead of darwin",
+			key:  "macos",
+			want: "",
+		},
+		{
+			name: "freebsd unsupported",
+			key:  "freebsd",
+			want: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseOSFromKey(tc.key)
+			if got != tc.want {
+				t.Errorf("parseOSFromKey(%q) = %q, want %q", tc.key, got, tc.want)
+			}
+		})
+	}
+}
