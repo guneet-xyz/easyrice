@@ -17,19 +17,58 @@ One binary that replaces GNU `stow` plus ad-hoc `install.sh` scripts:
 
 ## Installation
 
+### One-liner
+
+**Linux / macOS:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/guneet-xyz/easyrice/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/guneet-xyz/easyrice/main/install.ps1 | iex
+```
+
+Downloads the latest prebuilt binary for your OS/architecture from [GitHub Releases](https://github.com/guneet-xyz/easyrice/releases), verifies its SHA-256 checksum, installs to `~/.local/bin` (Linux/macOS) or `%LOCALAPPDATA%\Programs\easyrice` (Windows), creates a `rice` symlink, and optionally adds the install directory to your PATH. No Go toolchain required.
+
+Supported platforms: Linux (amd64, arm64), macOS (amd64, arm64), Windows (amd64, arm64).
+
+To install a specific version or to a custom directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/guneet-xyz/easyrice/main/install.sh | \
+  EASYRICE_VERSION=v0.2.0 EASYRICE_INSTALL_DIR=/usr/local/bin sh
+```
+
+```powershell
+$env:EASYRICE_VERSION = 'v0.2.0'; irm https://raw.githubusercontent.com/guneet-xyz/easyrice/main/install.ps1 | iex
+```
+
+### Manual download
+
+Grab the appropriate binary from [Releases](https://github.com/guneet-xyz/easyrice/releases/latest), verify it against `checksums.txt`, then move it onto your PATH:
+
+```sh
+chmod +x easyrice-v0.2.0-linux-amd64
+mv easyrice-v0.2.0-linux-amd64 ~/.local/bin/easyrice
+ln -sf ~/.local/bin/easyrice ~/.local/bin/rice
+```
+
+### From source
+
+Requires [Go 1.21+](https://go.dev/dl).
+
 ```sh
 git clone https://github.com/guneet-xyz/easyrice.git
 cd easyrice
 make install
 ```
 
-This compiles the binary to `$(go env GOPATH)/bin/easyrice` and creates a `rice` symlink alongside it (handy if you've got the muscle memory). Make sure `$(go env GOPATH)/bin` is on your `PATH`.
+This compiles the binary to `$(go env GOPATH)/bin/easyrice` and creates a `rice` symlink alongside it. Make sure `$(go env GOPATH)/bin` is on your `PATH`.
 
-To build locally without installing:
-
-```sh
-make build      # produces ./easyrice
-```
+> **macOS note**: On first run, macOS may block the binary as "unidentified developer". Run `xattr -d com.apple.quarantine ~/.local/bin/easyrice` to allow it. Binaries are currently unsigned.
 
 ## Getting started
 
