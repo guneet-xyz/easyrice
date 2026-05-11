@@ -48,3 +48,13 @@ cli/
 - DO NOT add commands without a `_test.go` file alongside.
 - DO NOT reintroduce a `--repo` flag - the managed-repo path is fixed.
 - DO NOT call `exec.Command("git", ...)` - all git ops go through `internal/repo`.
+
+## upgrade
+
+`easyrice upgrade` self-updates the `easyrice` binary from the latest GitHub release. Delegates to `internal/updater`.
+
+- Command name is `upgrade` (NOT `update`). `update` pulls the dotfile repo; `upgrade` replaces the binary. Do not confuse them, do not alias them.
+- Flag: `--check` performs a check-only run (no swap), prints the latest available version vs. current, and exits 0.
+- File: `cli/upgrade.go` (+ `cli/upgrade_test.go`).
+- MUST delegate all network I/O, file I/O, and binary-swap to `internal/updater`. No HTTP calls in `cli/`.
+- (placeholder — filled in T18 once `--check` and full flag set land in T13.)

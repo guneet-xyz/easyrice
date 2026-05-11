@@ -27,6 +27,7 @@ easyrice/
 │   ├── state/       # state.json read/write
 │   ├── logger/      # zap tee: console + file (debug always to file)
 │   ├── doctor/      # health checks (legacy state detection)
+│   ├── updater/     # self-update: GitHub release polling + binary swap (see internal/updater/AGENTS.md)
 │   └── prompt/      # RenderPlan, RenderSwitchPlan, RenderConflicts, Confirm
 ├── testdata/        # fixtures (testdata/manifest_valid_v2, testdata/manifest_invalid_v2, testdata/install_v2)
 ├── Makefile         # build / install / test / vet / fmt / clean
@@ -52,6 +53,7 @@ easyrice/
 | Change state.json shape | `internal/state/state.go` (`InstalledLink`, `PackageState`, `State`) |
 | Change log levels / output | `internal/logger/logger.go` |
 | Add health check | `internal/doctor/` |
+| Change self-update behavior | `internal/updater/` (+ `cli/upgrade.go`) |
 | Change prompt rendering | `internal/prompt/prompt.go` |
 
 ## CODE MAP
@@ -75,6 +77,10 @@ easyrice/
 | `logger.{Init,L,Sync,ParseLevel,Debug,Info,Warn,Error,Critical}` | func/var | `internal/logger/logger.go` | Global zap logger `L` |
 | `prompt.{RenderPlan,RenderSwitchPlan,RenderConflicts,Confirm}` | func | `internal/prompt/prompt.go` | TTY rendering + y/n |
 | `doctor.CheckLegacyState` | func | `internal/doctor/legacy_state.go` | Drift detection |
+| `updater.Updater`, `updater.CheckLatest`, `updater.Apply` | struct/func | `internal/updater/updater.go` | (placeholder — filled in T18) |
+| `updater.LoadCache`, `updater.SaveCache` | func | `internal/updater/types.go` | (placeholder — filled in T18) |
+| `updater.CleanupOrphans` | func | `internal/updater/cleanup.go` | (placeholder — filled in T18) |
+| `updater.ErrUpToDate`, `updater.ErrLocked` | var | `internal/updater/errors.go` | (placeholder — filled in T18) |
 
 Dependency direction: `cli/` → {`installer/`, `repo/`} → {`manifest`, `profile`, `plan`, `symlink`, `state`, `logger`}. Never the reverse. `prompt`, `doctor`, `logger` are leaf packages.
 
