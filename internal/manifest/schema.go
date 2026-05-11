@@ -7,7 +7,7 @@ import "fmt"
 // It contains a schema version and a map of packages, each with their own
 // configuration, profiles, and sources.
 type Manifest struct {
-	SchemaVersion int                  `toml:"schema_version"`
+	SchemaVersion int                   `toml:"schema_version"`
 	Packages      map[string]PackageDef `toml:"packages"`
 }
 

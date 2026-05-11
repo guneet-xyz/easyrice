@@ -16,10 +16,10 @@ var Version = "dev"
 
 // Repo path is fixed at internal/repo.DefaultRepoPath(); commands resolve it via that helper.
 var (
-	flagState           string
-	flagLogLevel        string
-	flagYes             bool
-	flagNoUpdateCheck   bool
+	flagState         string
+	flagLogLevel      string
+	flagYes           bool
+	flagNoUpdateCheck bool
 )
 
 var updateCheckDisabled bool
@@ -75,4 +75,3 @@ func init() {
 func UpdateCheckDisabled() bool {
 	return updateCheckDisabled
 }
-

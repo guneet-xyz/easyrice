@@ -9,9 +9,9 @@ import (
 
 // Release represents a GitHub release.
 type Release struct {
-	Version   string
-	URL       string
-	AssetURL  string
+	Version  string
+	URL      string
+	AssetURL string
 }
 
 // CheckResult represents the result of a version check.
