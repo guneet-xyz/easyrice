@@ -740,6 +740,272 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+
+		// Custom dependency edge case: only-probe (no install methods)
+		{
+			name: "custom dependency with only version_probe (no install)",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						VersionRegex: `v(\d+\.\d+\.\d+)`,
+						Install:      map[string]deps.CustomInstallMethod{},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency edge case: only-install (no version_probe)
+		{
+			name: "custom dependency with only install methods (no version_probe)",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{},
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "curl -fsSL https://example.com/install.sh | sh",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency edge case: multiple install methods
+		{
+			name: "custom dependency with multiple install methods",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux", "darwin"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "apt-get install mycustom",
+							},
+							"darwin": {
+								Description:  "Install on macOS",
+								ShellPayload: "brew install mycustom",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency edge case: valid complex regex pattern
+		{
+			name: "custom dependency with complex valid regex",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						VersionRegex: `^v?(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9]+))?$`,
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "curl -fsSL https://example.com/install.sh | sh",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency edge case: invalid regex with special chars
+		{
+			name: "custom dependency with invalid regex (unclosed bracket)",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						VersionRegex: `(\d+\.\d+\.\d+`,
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "curl -fsSL https://example.com/install.sh | sh",
+							},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "version_regex does not compile",
+		},
+
+		// Custom dependency edge case: empty shell_payload in one of multiple methods
+		{
+			name: "custom dependency with empty shell_payload in second method",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux", "darwin"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "apt-get install mycustom",
+							},
+							"darwin": {
+								Description:  "Install on macOS",
+								ShellPayload: "",
+							},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "shell_payload must not be empty",
+		},
+
+		// Custom dependency edge case: no version_regex but with version_probe
+		{
+			name: "custom dependency with version_probe but no version_regex",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						VersionRegex: "",
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "curl -fsSL https://example.com/install.sh | sh",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency edge case: install method with distro_families
+		{
+			name: "custom dependency with install method having distro_families",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						Install: map[string]deps.CustomInstallMethod{
+							"debian": {
+								Description:    "Install on Debian-based systems",
+								ShellPayload:   "apt-get install mycustom",
+								DistroFamilies: []string{"debian", "ubuntu"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tc := range cases {
