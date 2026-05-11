@@ -8,12 +8,12 @@ import (
 
 func TestCheckOS(t *testing.T) {
 	cases := []struct {
-		name        string
-		pkgName     string
-		pkgDef      *PackageDef
-		currentOS   string
-		wantErr     bool
-		errSubstr   string
+		name      string
+		pkgName   string
+		pkgDef    *PackageDef
+		currentOS string
+		wantErr   bool
+		errSubstr string
 	}{
 		// Happy path: single OS matches
 		{

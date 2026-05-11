@@ -13,11 +13,11 @@ import (
 )
 
 type fakeSwapper struct {
-	err           error
-	calls         int
-	gotAssetURL   string
-	gotAssetName  string
-	gotRealExe    string
+	err          error
+	calls        int
+	gotAssetURL  string
+	gotAssetName string
+	gotRealExe   string
 }
 
 func (f *fakeSwapper) Swap(ctx context.Context, assetURL, assetFileName, realExe string) error {
