@@ -3,8 +3,10 @@ package installer
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
+	"github.com/guneet-xyz/easyrice/internal/symlink"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -185,4 +187,84 @@ func TestConflict_Error(t *testing.T) {
 	errMsg := c.Error()
 	assert.Contains(t, errMsg, "/path/to/target")
 	assert.Contains(t, errMsg, "existing file")
+}
+
+func TestDetectConflicts_LstatPermissionError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission semantics differ on windows")
+	}
+
+	tmpDir := t.TempDir()
+	parentDir := filepath.Join(tmpDir, "parent")
+	targetDir := filepath.Join(parentDir, "target")
+
+	err := os.Mkdir(parentDir, 0755)
+	require.NoError(t, err)
+
+	err = os.Mkdir(targetDir, 0755)
+	require.NoError(t, err)
+
+	err = os.Chmod(parentDir, 0o000)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = os.Chmod(parentDir, 0o755)
+	})
+
+	planned := []PlannedLink{
+		{Source: "/src/a", Target: targetDir},
+	}
+
+	conflicts := DetectConflicts(planned, nil)
+
+	require.Len(t, conflicts, 1)
+	assert.Equal(t, targetDir, conflicts[0].Target)
+	assert.Equal(t, "/src/a", conflicts[0].Source)
+	assert.Contains(t, conflicts[0].Reason, "failed to check target")
+}
+
+func TestDetectConflicts_DirSymlinkConflict(t *testing.T) {
+	tmpDir := t.TempDir()
+	sourceDir := filepath.Join(tmpDir, "source_dir")
+	otherDir := filepath.Join(tmpDir, "other_dir")
+	targetPath := filepath.Join(tmpDir, "target_symlink")
+
+	err := os.Mkdir(sourceDir, 0755)
+	require.NoError(t, err)
+	err = os.Mkdir(otherDir, 0755)
+	require.NoError(t, err)
+
+	err = symlink.CreateSymlink(otherDir, targetPath)
+	require.NoError(t, err)
+
+	planned := []PlannedLink{
+		{Source: sourceDir, Target: targetPath, IsDir: true},
+	}
+
+	conflicts := DetectConflicts(planned, nil)
+
+	require.Len(t, conflicts, 1)
+	assert.Equal(t, targetPath, conflicts[0].Target)
+	assert.Equal(t, sourceDir, conflicts[0].Source)
+	assert.True(t, conflicts[0].IsDir)
+	assert.Contains(t, conflicts[0].Reason, "symlink points to")
+}
+
+func TestDetectConflicts_DirectoryFolderMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "target")
+
+	err := os.Mkdir(target, 0755)
+	require.NoError(t, err)
+
+	planned := []PlannedLink{
+		{Source: "/src/a", Target: target, IsDir: true},
+	}
+
+	conflicts := DetectConflicts(planned, nil)
+	require.Len(t, conflicts, 1)
+	assert.Equal(t, target, conflicts[0].Target)
+	assert.Equal(t, "/src/a", conflicts[0].Source)
+	assert.True(t, conflicts[0].IsDir)
+	assert.Equal(t, "existing directory (folder-mode requires symlink or absent path)", conflicts[0].Reason)
 }
