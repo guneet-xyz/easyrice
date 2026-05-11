@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -12,7 +13,14 @@ import (
 // validating checksums, managing the update cache with TTL, and coordinating atomic binary swaps.
 // The Updater type is injectable and carries state for HTTP client, cache directory, and GitHub credentials.
 type Updater struct {
-	opts Options
+	opts    Options
+	fetcher releaseFetcher
+}
+
+// releaseFetcher abstracts release lookup behind an interface so callers can
+// substitute alternative sources (default: GitHub via go-selfupdate).
+type releaseFetcher interface {
+	FetchLatest(ctx context.Context) (*Release, error)
 }
 
 // New constructs a new Updater with the given options.

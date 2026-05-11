@@ -19,6 +19,13 @@ import (
 //   - SECURITY: HTTPS only — see internal/updater/AGENTS.md
 //   - No GITHUB_TOKEN is read; v1 is anonymous-only.
 func (u *Updater) FetchLatest(ctx context.Context) (*Release, error) {
+	if u.fetcher != nil {
+		return u.fetcher.FetchLatest(ctx)
+	}
+	return u.fetchLatestFromGitHub(ctx)
+}
+
+func (u *Updater) fetchLatestFromGitHub(ctx context.Context) (*Release, error) {
 	// SECURITY: HTTPS only — see internal/updater/AGENTS.md
 	source, err := selfupdate.NewGitHubSource(selfupdate.GitHubConfig{})
 	if err != nil {
