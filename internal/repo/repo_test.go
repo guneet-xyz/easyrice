@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -218,5 +219,39 @@ func TestDefaultRepoPath_FallbackWhenUserConfigDirFails(t *testing.T) {
 	}
 	if !strings.Contains(got, "easyrice") {
 		t.Fatalf("DefaultRepoPath should contain 'easyrice', got %q", got)
+	}
+}
+
+func TestClone_ContextCancelled(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	dest := filepath.Join(t.TempDir(), "clone")
+	err := Clone(ctx, "https://example.com/repo.git", dest)
+	if err == nil {
+		t.Fatal("expected error when context is cancelled")
+	}
+	if !strings.Contains(err.Error(), "context") && !errors.Is(err, context.Canceled) {
+		t.Fatalf("error %q should mention context or wrap context.Canceled", err.Error())
+	}
+}
+
+func TestPull_ContextCancelled(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	repoPath := t.TempDir()
+	err := Pull(ctx, repoPath)
+	if err == nil {
+		t.Fatal("expected error when context is cancelled")
+	}
+	if !strings.Contains(err.Error(), "context") && !errors.Is(err, context.Canceled) {
+		t.Fatalf("error %q should mention context or wrap context.Canceled", err.Error())
 	}
 }
