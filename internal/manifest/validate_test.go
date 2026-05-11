@@ -3,6 +3,7 @@ package manifest
 import (
 	"testing"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -464,6 +465,280 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr:   true,
 			errSubstr: "target must not be empty",
+		},
+
+		// Dependency validation: empty dependency name
+		{
+			name: "empty dependency name",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+						Dependencies: []deps.DependencyRef{
+							{Name: "", Version: ""},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "dependency name is required",
+		},
+
+		// Dependency validation: reserved self-dependency
+		{
+			name: "reserved self-dependency",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"neovim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+						Dependencies: []deps.DependencyRef{
+							{Name: "neovim", Version: ""},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "reserved name",
+		},
+
+		// Dependency validation: invalid semver constraint
+		{
+			name: "invalid semver constraint",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+						Dependencies: []deps.DependencyRef{
+							{Name: "ripgrep", Version: "not-semver"},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "invalid semver constraint",
+		},
+
+		// Dependency validation: valid dependency with semver constraint
+		{
+			name: "valid dependency with semver constraint",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+						Dependencies: []deps.DependencyRef{
+							{Name: "ripgrep", Version: ">=1.0.0"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+
+		// Custom dependency validation: empty version_probe and install
+		{
+			name: "custom dependency with empty version_probe and install",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{},
+						Install:      map[string]deps.CustomInstallMethod{},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "must have at least one of version_probe or install methods",
+		},
+
+		// Custom dependency validation: invalid version_regex
+		{
+			name: "custom dependency with invalid version_regex",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"echo", "1.0.0"},
+						VersionRegex: "[invalid(regex",
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "version_regex does not compile",
+		},
+
+		// Custom dependency validation: empty shell_payload
+		{
+			name: "custom dependency with empty shell_payload",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "",
+							},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "shell_payload must not be empty",
+		},
+
+		// Custom dependency validation: reserved name collision
+		{
+			name: "custom dependency with reserved name",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"neovim": {
+						VersionProbe: []string{"nvim", "--version"},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "name is reserved",
+		},
+
+		// Custom dependency validation: registry name collision
+		{
+			name: "custom dependency with registry name",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"nvm": {
+						VersionProbe: []string{"nvm", "--version"},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "name is already in the registry",
+		},
+
+		// Custom dependency validation: valid custom dependency
+		{
+			name: "valid custom dependency",
+			manifest: &Manifest{
+				SchemaVersion: 1,
+				Packages: map[string]PackageDef{
+					"nvim": {
+						SupportedOS: []string{"linux"},
+						Profiles: map[string]ProfileDef{
+							"default": {
+								Sources: []SourceSpec{
+									{Path: "config", Mode: "file", Target: "$HOME/.config/nvim"},
+								},
+							},
+						},
+					},
+				},
+				CustomDependencies: map[string]deps.CustomDependencyDef{
+					"mycustom": {
+						VersionProbe: []string{"mycustom", "--version"},
+						VersionRegex: `v(\d+\.\d+\.\d+)`,
+						Install: map[string]deps.CustomInstallMethod{
+							"linux": {
+								Description:  "Install on Linux",
+								ShellPayload: "curl -fsSL https://example.com/install.sh | sh",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 	}
 

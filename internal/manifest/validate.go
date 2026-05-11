@@ -3,7 +3,10 @@ package manifest
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/guneet-xyz/easyrice/internal/deps"
 )
 
 // Validate checks that a Manifest conforms to all schema rules.
@@ -91,6 +94,45 @@ func Validate(m *Manifest) error {
 					return fmt.Errorf("validate: package %q: profile %q source[%d]: target must not be empty", name, profileName, i)
 				}
 			}
+		}
+
+		// Validate Dependencies
+		for _, dep := range pkg.Dependencies {
+			if dep.Name == "" {
+				return fmt.Errorf("validate: package %q: dependency name is required", name)
+			}
+			if deps.IsReserved(name) && dep.Name == name {
+				return fmt.Errorf("validate: package %q is a reserved name; declaring a %q self-dependency is forbidden (it is implicit)", name, dep.Name)
+			}
+			if dep.Version != "" {
+				if err := deps.IsValidConstraint(dep.Version); err != nil {
+					return fmt.Errorf("validate: package %q: dependency %q: %w", name, dep.Name, err)
+				}
+			}
+		}
+	}
+
+	// Validate CustomDependencies
+	for customName, customDef := range m.CustomDependencies {
+		if len(customDef.VersionProbe) == 0 && len(customDef.Install) == 0 {
+			return fmt.Errorf("validate: custom_dependency %q: must have at least one of version_probe or install methods", customName)
+		}
+		if customDef.VersionRegex != "" {
+			if _, err := regexp.Compile(customDef.VersionRegex); err != nil {
+				return fmt.Errorf("validate: custom_dependency %q: version_regex does not compile: %w", customName, err)
+			}
+		}
+		for methodKey, method := range customDef.Install {
+			if method.ShellPayload == "" {
+				return fmt.Errorf("validate: custom_dependency %q: install method %q: shell_payload must not be empty", customName, methodKey)
+			}
+		}
+		// Reject names that collide with reserved or registry names
+		if deps.IsReserved(customName) {
+			return fmt.Errorf("validate: custom_dependency %q: name is reserved; cannot override a reserved dependency", customName)
+		}
+		if _, ok := deps.RegistryDep(customName); ok {
+			return fmt.Errorf("validate: custom_dependency %q: name is already in the registry; cannot override a registry dependency", customName)
 		}
 	}
 
