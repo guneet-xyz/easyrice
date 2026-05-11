@@ -1,0 +1,12 @@
+schema_version = 1
+
+[custom_dependencies.neovim]
+description = "Trying to override reserved neovim"
+version_probe = ["nvim", "--version"]
+
+[packages.ghostty]
+description = "Ghostty terminal emulator configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME/.config/ghostty"}]

@@ -171,6 +171,7 @@ func ExecuteUninstallPlan(p *plan.Plan, statePath string) error {
 	}
 
 	// 3. Remove package entry from state: delete(s, p.PackageName)
+	// Deps are NOT removed from the system; only the state tracking is cleared.
 	delete(s, p.PackageName)
 
 	// 4. Save state

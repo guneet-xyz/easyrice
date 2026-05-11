@@ -1,0 +1,33 @@
+schema_version = 1
+
+[custom_dependencies.mdformat]
+description = "Markdown formatter"
+version_probe = ["mdformat", "--version"]
+version_regex = "mdformat ([0-9.]+)"
+
+[custom_dependencies.mdformat.install.linux_debian]
+description = "Install via pip"
+shell_payload = "pip install mdformat"
+
+[custom_dependencies.mdformat.install.darwin]
+description = "Install via pip"
+shell_payload = "pip install mdformat"
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+dependencies = [
+  {name = "neovim", version = ">=0.10"},
+  {name = "ripgrep"},
+  {name = "mdformat"},
+]
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+
+[packages.zsh]
+description = "Zsh configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.zsh.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME"}]

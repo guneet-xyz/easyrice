@@ -1,0 +1,9 @@
+schema_version = 1
+
+[packages.neovim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+dependencies = [{name = "neovim"}]
+
+[packages.neovim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]

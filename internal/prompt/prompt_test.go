@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/plan"
 	"github.com/stretchr/testify/assert"
 )
@@ -565,4 +566,157 @@ func TestSelectWithDefault_AutoAcceptFalse(t *testing.T) {
 
 func TestSelect_APISignature(t *testing.T) {
 	var _ func(io.Reader, io.Writer, string, []SelectOption, int) (int, error) = Select
+}
+
+func TestRenderDepReport_AllStatuses(t *testing.T) {
+	report := deps.DepReport{
+		Entries: []deps.DepReportEntry{
+			{
+				Dep:              deps.ResolvedDependency{Name: "ripgrep"},
+				Status:           deps.DepOK,
+				InstalledVersion: "14.1.0",
+			},
+			{
+				Dep:    deps.ResolvedDependency{Name: "neovim"},
+				Status: deps.DepMissing,
+			},
+			{
+				Dep:              deps.ResolvedDependency{Name: "node", Version: ">=20"},
+				Status:           deps.DepVersionMismatch,
+				InstalledVersion: "18.20.0",
+			},
+			{
+				Dep:              deps.ResolvedDependency{Name: "mdformat"},
+				Status:           deps.DepProbeUnknownVersion,
+				InstalledVersion: "",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "Dependency check:")
+	assert.Contains(t, output, "✓ ripgrep (14.1.0) — installed")
+	assert.Contains(t, output, "✗ neovim — missing")
+	assert.Contains(t, output, "! node (18.20.0) — version mismatch, need >=20")
+	assert.Contains(t, output, "? mdformat — installed (version unknown)")
+}
+
+func TestRenderDepReport_Empty(t *testing.T) {
+	report := deps.DepReport{Entries: []deps.DepReportEntry{}}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "Dependency check:")
+	assert.Equal(t, "Dependency check:\n", output)
+}
+
+func TestSelectInstallMethod_AutoAcceptTrue(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "ripgrep"},
+		Methods: []deps.InstallMethod{
+			{ID: "apt", Description: "apt install ripgrep", Command: []string{"apt", "install", "ripgrep"}},
+			{ID: "brew", Description: "brew install ripgrep", Command: []string{"brew", "install", "ripgrep"}},
+		},
+	}
+
+	in := strings.NewReader("")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, true)
+	assert.NoError(t, err)
+	assert.Equal(t, "apt", method.ID)
+	assert.Contains(t, out.String(), "Using: apt install ripgrep")
+}
+
+func TestSelectInstallMethod_UserSelection(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "ripgrep"},
+		Methods: []deps.InstallMethod{
+			{ID: "apt", Description: "apt install ripgrep", Command: []string{"apt", "install", "ripgrep"}},
+			{ID: "brew", Description: "brew install ripgrep", Command: []string{"brew", "install", "ripgrep"}},
+		},
+	}
+
+	in := strings.NewReader("2\n")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, false)
+	assert.NoError(t, err)
+	assert.Equal(t, "brew", method.ID)
+	assert.Contains(t, out.String(), "Choose install method for ripgrep:")
+}
+
+func TestSelectInstallMethod_CustomMethodConfirmYes(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "custom-tool"},
+		Methods: []deps.InstallMethod{
+			{ID: "custom", Description: "custom install", ShellPayload: "curl https://example.com/install.sh | sh"},
+		},
+	}
+
+	in := strings.NewReader("y\n")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, true)
+	assert.NoError(t, err)
+	assert.Equal(t, "custom", method.ID)
+	assert.Contains(t, out.String(), "Run this command from your dotfile repo's rice.toml?")
+}
+
+func TestSelectInstallMethod_CustomMethodConfirmNo(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep: deps.ResolvedDependency{Name: "custom-tool"},
+		Methods: []deps.InstallMethod{
+			{ID: "custom", Description: "custom install", ShellPayload: "curl https://example.com/install.sh | sh"},
+		},
+	}
+
+	in := strings.NewReader("n\n")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, true)
+	assert.Equal(t, ErrUserDeclined, err)
+	assert.Equal(t, deps.InstallMethod{}, method)
+}
+
+func TestSelectInstallMethod_NoMethods(t *testing.T) {
+	entry := deps.DepReportEntry{
+		Dep:     deps.ResolvedDependency{Name: "unknown-tool"},
+		Methods: []deps.InstallMethod{},
+	}
+
+	in := strings.NewReader("")
+	var out bytes.Buffer
+
+	method, err := SelectInstallMethod(in, &out, entry, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no install methods available for")
+	assert.Equal(t, deps.InstallMethod{}, method)
+}
+
+func TestShorten(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{"short string", "hello", 10, "hello"},
+		{"exact length", "hello", 5, "hello"},
+		{"truncate", "hello world", 5, "hello..."},
+		{"empty string", "", 5, ""},
+		{"single char truncate", "a", 0, "..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shorten(tt.input, tt.maxLen)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

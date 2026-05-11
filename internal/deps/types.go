@@ -48,7 +48,7 @@ type ProbeSpec struct {
 type InstallMethod struct {
 	ID             string   `toml:"id"`
 	Description    string   `toml:"description"`
-	OS             string   `toml:"os"`             // "linux", "darwin", "windows"
+	OS             string   `toml:"os"`              // "linux", "darwin", "windows"
 	DistroFamilies []string `toml:"distro_families"` // empty = all distros for this OS
 	Command        []string `toml:"command"`         // explicit argv (registry)
 	ShellPayload   string   `toml:"shell_payload"`   // sh -c payload (custom only)

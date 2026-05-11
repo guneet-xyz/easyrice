@@ -19,10 +19,10 @@ type InstalledLink struct {
 
 // PackageState represents the state of a single installed package.
 type PackageState struct {
-	Profile                string                    `json:"profile"`
-	InstalledLinks         []InstalledLink           `json:"installed_links"`
-	InstalledAt            time.Time                 `json:"installed_at"`
-	InstalledDependencies  []deps.InstalledDependency `json:"installed_dependencies,omitempty"`
+	Profile               string                     `json:"profile"`
+	InstalledLinks        []InstalledLink            `json:"installed_links"`
+	InstalledAt           time.Time                  `json:"installed_at"`
+	InstalledDependencies []deps.InstalledDependency `json:"installed_dependencies,omitempty"`
 }
 
 // State is the top-level state file structure.

@@ -94,9 +94,9 @@ func TestMatchVersion(t *testing.T) {
 
 func TestIsValidConstraint(t *testing.T) {
 	cases := []struct {
-		name      string
+		name       string
 		constraint string
-		wantErr   bool
+		wantErr    bool
 	}{
 		{
 			name:       "empty constraint is valid",

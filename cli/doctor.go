@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/doctor"
+	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/symlink"
@@ -47,6 +52,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(out, "[ERROR] Cannot read state file %s: %v\n", flagState, err)
 		issues++
 		st = state.State{}
+	}
+
+	repoPath := repo.DefaultRepoPath()
+	mf, err := manifest.LoadFile(repo.RepoTomlPath(repoPath))
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(out, "[WARN] Cannot load manifest: %v\n", err)
+		}
+	} else {
+		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+		defer cancel()
+		runner := &deps.ExecRunner{}
+		warnings := doctor.CheckDeclaredDeps(ctx, out, runner, *mf)
+		issues += warnings
 	}
 
 	for pkgName, pkgState := range st {

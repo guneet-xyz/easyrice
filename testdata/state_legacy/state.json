@@ -1,0 +1,12 @@
+{
+  "nvim": {
+    "profile": "default",
+    "installed_links": [
+      {
+        "source": "/home/user/.config/easyrice/repos/default/nvim/config",
+        "target": "/home/user/.config/nvim"
+      }
+    ],
+    "installed_at": "2025-05-10T12:34:56Z"
+  }
+}

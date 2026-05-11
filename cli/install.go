@@ -7,12 +7,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/installer"
+	"github.com/guneet-xyz/easyrice/internal/logger"
 	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/profile"
 	"github.com/guneet-xyz/easyrice/internal/prompt"
 	"github.com/guneet-xyz/easyrice/internal/repo"
+	"github.com/guneet-xyz/easyrice/internal/state"
 )
+
+// DepsRunner is the runner used for dependency checks and installs.
+// Tests may swap this to a deps.MockRunner before calling Execute().
+var DepsRunner deps.Runner = &deps.ExecRunner{}
 
 var installCmd = &cobra.Command{
 	Use:   "install <package>",
@@ -21,10 +28,14 @@ var installCmd = &cobra.Command{
 	RunE:  runInstall,
 }
 
-var flagProfile string
+var (
+	flagProfile  string
+	flagSkipDeps bool
+)
 
 func init() {
 	installCmd.Flags().StringVar(&flagProfile, "profile", "", "profile to install (default: auto-detected from hostname)")
+	installCmd.Flags().BoolVar(&flagSkipDeps, "skip-deps", false, "skip dependency check and install")
 	rootCmd.AddCommand(installCmd)
 }
 
@@ -57,6 +68,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	specs, err := profile.ResolveSpecs(&pkgDef, pkgName, flagProfile)
 	if err != nil {
 		return fmt.Errorf("resolve profile: %w", err)
+	}
+
+	if flagSkipDeps {
+		logger.L.Warn("skipping dependency check")
+	} else {
+		s, err := state.Load(flagState)
+		if err != nil {
+			return fmt.Errorf("load state: %w", err)
+		}
+		updated, err := installer.EnsureDependencies(cmd.Context(), DepsRunner, *mf, pkgName, flagYes, s)
+		if err != nil {
+			return fmt.Errorf("ensure dependencies: %w", err)
+		}
+		if len(updated[pkgName].InstalledDependencies) > len(s[pkgName].InstalledDependencies) {
+			if err := state.Save(flagState, updated); err != nil {
+				return fmt.Errorf("save state: %w", err)
+			}
+		}
 	}
 
 	home, err := os.UserHomeDir()

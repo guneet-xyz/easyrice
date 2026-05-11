@@ -183,8 +183,8 @@ func TestSwitch_NoRepo(t *testing.T) {
 		"switch", "mypkg", "macbook",
 	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "manifest",
-		"error must indicate manifest load failure; got: %v", err)
+	assert.Contains(t, err.Error(), "repo not initialized",
+		"error must indicate repo not initialized; got: %v", err)
 }
 
 // TestSwitch_ProfileNotDeclared asserts switch fails when the new profile is

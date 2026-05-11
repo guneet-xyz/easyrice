@@ -10,6 +10,7 @@ import (
 //   - If RegistryDep(ref.Name) exists → use registry entry; override Version with ref.Version
 //   - Else if custom[ref.Name] exists → build ResolvedDependency from CustomDependencyDef
 //   - Else → return error "unknown dependency %q (not in registry, not declared in custom_dependencies)"
+//
 // Preserves input order in output slice.
 func Resolve(refs []DependencyRef, custom map[string]CustomDependencyDef) ([]ResolvedDependency, error) {
 	result := make([]ResolvedDependency, 0, len(refs))

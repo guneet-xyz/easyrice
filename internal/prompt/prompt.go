@@ -2,14 +2,19 @@ package prompt
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/plan"
 )
+
+// ErrUserDeclined is returned when a user declines a confirmation prompt.
+var ErrUserDeclined = errors.New("user declined")
 
 // RenderPlan writes the human-readable plan to w.
 // Format for install:
@@ -228,4 +233,97 @@ func SelectWithDefault(in io.Reader, out io.Writer, label string, options []Sele
 		}
 	}
 	return 0, fmt.Errorf("prompt: too many invalid inputs")
+}
+
+// shorten truncates s to n characters, appending "..." if longer.
+func shorten(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
+
+// RenderDepReport writes a human-readable dependency check report to w.
+// Format:
+//
+//	Dependency check:
+//	  ✓ ripgrep (14.1.0) — installed
+//	  ✗ neovim — missing
+//	  ! node (18.20.0) — version mismatch, need >=20
+//	  ? mdformat — installed (version unknown)
+func RenderDepReport(w io.Writer, report deps.DepReport) {
+	fmt.Fprintf(w, "Dependency check:\n")
+	for _, entry := range report.Entries {
+		var glyph string
+		var status string
+
+		switch entry.Status {
+		case deps.DepOK:
+			glyph = "✓"
+			status = "installed"
+		case deps.DepMissing:
+			glyph = "✗"
+			status = "missing"
+		case deps.DepVersionMismatch:
+			glyph = "!"
+			status = fmt.Sprintf("version mismatch, need %s", entry.Dep.Version)
+		case deps.DepProbeUnknownVersion:
+			glyph = "?"
+			status = "installed (version unknown)"
+		default:
+			glyph = "?"
+			status = "unknown"
+		}
+
+		// Format version info
+		var versionStr string
+		if entry.InstalledVersion != "" {
+			versionStr = fmt.Sprintf(" (%s)", entry.InstalledVersion)
+		}
+
+		fmt.Fprintf(w, "  %s %s%s — %s\n", glyph, entry.Dep.Name, versionStr, status)
+	}
+}
+
+// SelectInstallMethod prompts the user to choose an install method for a dependency.
+// If autoAccept is true, selects the first method without prompting (but still prints "Using: ...").
+// For custom methods (ShellPayload != ""), prompts for confirmation before returning.
+// Returns ErrUserDeclined if user declines the custom method confirmation.
+// Returns an error if no methods are available.
+func SelectInstallMethod(in io.Reader, out io.Writer, entry deps.DepReportEntry, autoAccept bool) (deps.InstallMethod, error) {
+	if len(entry.Methods) == 0 {
+		return deps.InstallMethod{}, fmt.Errorf("no install methods available for %q", entry.Dep.Name)
+	}
+
+	// Build options for Select
+	options := make([]SelectOption, len(entry.Methods))
+	for i, m := range entry.Methods {
+		options[i].Label = m.Description
+		if m.Command != nil {
+			options[i].Description = strings.Join(m.Command, " ")
+		} else if m.ShellPayload != "" {
+			options[i].Description = shorten(m.ShellPayload, 60)
+		}
+	}
+
+	// Select method
+	idx, err := SelectWithDefault(in, out, fmt.Sprintf("Choose install method for %s:", entry.Dep.Name), options, 0, autoAccept)
+	if err != nil {
+		return deps.InstallMethod{}, err
+	}
+
+	selected := entry.Methods[idx]
+
+	// For custom methods, prompt for confirmation
+	if selected.ShellPayload != "" {
+		ok, err := Confirm(in, out, fmt.Sprintf("Run this command from your dotfile repo's rice.toml? %s", selected.ShellPayload))
+		if err != nil {
+			return deps.InstallMethod{}, err
+		}
+		if !ok {
+			return deps.InstallMethod{}, ErrUserDeclined
+		}
+	}
+
+	return selected, nil
 }

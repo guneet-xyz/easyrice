@@ -269,10 +269,13 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 	created := make([]state.InstalledLink, 0, len(p.Ops))
 
 	saveAndReturn := func(execErr error) (*InstallResult, error) {
+		// InstalledDependencies is populated by installer.EnsureDependencies before plan execution; preserve it here.
+		existing := st[p.PackageName]
 		st[p.PackageName] = state.PackageState{
-			Profile:        p.Profile,
-			InstalledLinks: created,
-			InstalledAt:    time.Now(),
+			Profile:               p.Profile,
+			InstalledLinks:        created,
+			InstalledAt:           time.Now(),
+			InstalledDependencies: existing.InstalledDependencies,
 		}
 		if saveErr := state.Save(statePath, st); saveErr != nil {
 			logger.Error("Failed to save partial state",
@@ -315,10 +318,13 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 	}
 
 	// Success: save full state
+	// InstalledDependencies is populated by installer.EnsureDependencies before plan execution; preserve it here.
+	existing := st[p.PackageName]
 	st[p.PackageName] = state.PackageState{
-		Profile:        p.Profile,
-		InstalledLinks: created,
-		InstalledAt:    time.Now(),
+		Profile:               p.Profile,
+		InstalledLinks:        created,
+		InstalledAt:           time.Now(),
+		InstalledDependencies: existing.InstalledDependencies,
 	}
 	if err := state.Save(statePath, st); err != nil {
 		return &InstallResult{LinksCreated: created}, fmt.Errorf("failed to save state: %w", err)
