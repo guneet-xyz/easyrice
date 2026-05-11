@@ -67,3 +67,49 @@ sources = ["bad/path"]
 	require.Error(t, err, "expected error for bare string in sources")
 	assert.Contains(t, err.Error(), "expected a table", "error should mention expected table form")
 }
+
+func TestSchema_DependenciesAndCustomDependencies(t *testing.T) {
+	tomlStr := `schema_version = 1
+
+[custom_dependencies.foo]
+version_probe = ["foo", "--version"]
+version_regex = "foo (\\d+\\.\\d+\\.\\d+)"
+
+[custom_dependencies.foo.install.linux]
+description = "Install foo on Linux"
+shell_payload = "apt-get install foo"
+distro_families = ["debian"]
+
+[packages.myapp]
+description = "My application"
+supported_os = ["linux", "darwin"]
+dependencies = [{name = "foo", version = ">=1.0.0"}]
+
+[packages.myapp.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME/.config/myapp"}]
+`
+
+	var m Manifest
+	_, err := toml.Decode(tomlStr, &m)
+	require.NoError(t, err, "failed to decode TOML with dependencies and custom_dependencies")
+
+	// Verify custom_dependencies
+	assert.Len(t, m.CustomDependencies, 1)
+	foo, ok := m.CustomDependencies["foo"]
+	require.True(t, ok, "custom dependency 'foo' not found")
+	assert.Equal(t, []string{"foo", "--version"}, foo.VersionProbe)
+	assert.Equal(t, "foo (\\d+\\.\\d+\\.\\d+)", foo.VersionRegex)
+	assert.Len(t, foo.Install, 1)
+	linuxInstall, ok := foo.Install["linux"]
+	require.True(t, ok, "linux install method not found")
+	assert.Equal(t, "Install foo on Linux", linuxInstall.Description)
+	assert.Equal(t, "apt-get install foo", linuxInstall.ShellPayload)
+	assert.Equal(t, []string{"debian"}, linuxInstall.DistroFamilies)
+
+	// Verify package dependencies
+	myapp, ok := m.Packages["myapp"]
+	require.True(t, ok, "myapp package not found")
+	assert.Len(t, myapp.Dependencies, 1)
+	assert.Equal(t, "foo", myapp.Dependencies[0].Name)
+	assert.Equal(t, ">=1.0.0", myapp.Dependencies[0].Version)
+}
