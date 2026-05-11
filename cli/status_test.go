@@ -332,3 +332,49 @@ sources = [{path = "x", mode = "file", target = "$HOME"}]
 	assert.Contains(t, out, "Declared dependencies:")
 	assert.NotContains(t, out, "Warning: dependency check failed")
 }
+
+func TestStatus_LoadStateError(t *testing.T) {
+	resetInstallFlags()
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+	require.NoError(t, os.WriteFile(statePath, []byte("{not valid json"), 0o644))
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "load state")
+}
+
+func TestStatus_PrintsInstalledDependencies(t *testing.T) {
+	resetInstallFlags()
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	source := filepath.Join(tmp, "src.toml")
+	target := filepath.Join(tmp, "tgt.toml")
+	require.NoError(t, os.WriteFile(source, []byte("x"), 0o644))
+	require.NoError(t, os.Symlink(source, target))
+
+	writeStatusState(t, statePath, state.State{
+		"mypkg": state.PackageState{
+			Profile:        "common",
+			InstalledLinks: []state.InstalledLink{{Source: source, Target: target}},
+			InstalledAt:    time.Now(),
+			InstalledDependencies: []deps.InstalledDependency{
+				{Name: "neovim", Version: "0.9.0", Method: "brew", InstalledAt: time.Now()},
+			},
+		},
+	})
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Installed dependencies:")
+	assert.Contains(t, out, "neovim")
+	assert.Contains(t, out, "0.9.0")
+	assert.Contains(t, out, "brew")
+}

@@ -77,11 +77,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("load state: %w", err)
 		}
+		prevDeps := len(s[pkgName].InstalledDependencies)
 		updated, err := installer.EnsureDependencies(cmd.Context(), DepsRunner, *mf, pkgName, flagYes, s)
 		if err != nil {
 			return fmt.Errorf("ensure dependencies: %w", err)
 		}
-		if len(updated[pkgName].InstalledDependencies) > len(s[pkgName].InstalledDependencies) {
+		if len(updated[pkgName].InstalledDependencies) > prevDeps {
 			if err := state.Save(flagState, updated); err != nil {
 				return fmt.Errorf("save state: %w", err)
 			}

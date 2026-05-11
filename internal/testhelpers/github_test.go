@@ -5,7 +5,37 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestFakeGitHubServer_AssetEndpoints(t *testing.T) {
+	srv := FakeGitHubServer(t, FakeReleaseOpts{
+		Version:          "v1.0.0",
+		AssetBytes:       []byte("binary-payload"),
+		IncludeChecksums: true,
+	})
+
+	resp, err := http.Get(srv.URL + "/asset/easyrice_linux_amd64.tar.gz")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "binary-payload", string(body))
+
+	resp2, err := http.Get(srv.URL + "/asset/checksums.txt")
+	require.NoError(t, err)
+	defer resp2.Body.Close()
+	body2, err := io.ReadAll(resp2.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body2), "sha256")
+
+	resp3, err := http.Get(srv.URL + "/unknown")
+	require.NoError(t, err)
+	defer resp3.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp3.StatusCode)
+}
 
 func TestFakeGitHubServer_ReturnsValidJSON(t *testing.T) {
 	opts := FakeReleaseOpts{

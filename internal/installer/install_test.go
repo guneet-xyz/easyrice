@@ -258,6 +258,26 @@ func TestBuildInstallPlan_RootDefaultsToName(t *testing.T) {
 	}
 }
 
+// TestInstall_WrapperPropagatesBuildError covers the Install convenience
+// wrapper's Build-error branch: a pre-existing foreign file at a planned
+// target makes BuildInstallPlan return an error which the wrapper must
+// surface verbatim with a nil result.
+func TestInstall_WrapperPropagatesBuildError(t *testing.T) {
+	repo := fixtureRepo(t)
+	req := newRequest(t, repo, "ghostty", "macbook")
+
+	conflictPath := filepath.Join(req.HomeDir, ".config", "ghostty", "config")
+	require.NoError(t, os.MkdirAll(filepath.Dir(conflictPath), 0o755))
+	require.NoError(t, os.WriteFile(conflictPath, []byte("pre-existing"), 0o644))
+
+	result, err := Install(req)
+	require.Error(t, err)
+	assert.Nil(t, result, "wrapper must return nil result when Build fails")
+
+	_, statErr := os.Stat(req.StatePath)
+	assert.True(t, os.IsNotExist(statErr), "no state should be written when Build fails")
+}
+
 func TestBuildInstallPlan_RootCustom(t *testing.T) {
 	repo := fixtureRepo(t)
 	req := newRequest(t, repo, "nvim", "default")

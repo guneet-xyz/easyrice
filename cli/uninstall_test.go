@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -182,3 +185,50 @@ func TestUninstall_NoRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "not installed",
 		"expected 'not installed' (uninstall reads state, not repo); got: %v", err)
 }
+
+func TestUninstall_PromptReaderError(t *testing.T) {
+	resetInstallFlags()
+	repoRoot, statePath, _ := setupTestRepo(t)
+	installForUninstall(t, repoRoot, statePath)
+
+	resetInstallFlags()
+
+	buf := &bytes.Buffer{}
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetIn(iotest.ErrReader(errors.New("read failure")))
+	rootCmd.SetArgs([]string{"--state", statePath, "uninstall", "mypkg"})
+	err := rootCmd.Execute()
+	rootCmd.SetIn(os.Stdin)
+	rootCmd.SetOut(os.Stdout)
+	rootCmd.SetErr(os.Stderr)
+
+	require.Error(t, err, "out=%s", buf.String())
+	assert.Contains(t, err.Error(), "read failure")
+}
+
+// TestUninstall_ExecutePlanError forces ExecuteUninstallPlan's state.Save to
+// fail by making the state file read-only after the install side has populated
+// it. BuildUninstallPlan still loads the file successfully; the failure
+// surfaces only at the final state.Save call.
+func TestUninstall_ExecutePlanError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses permission bits")
+	}
+	resetInstallFlags()
+	repoRoot, statePath, _ := setupTestRepo(t)
+	installForUninstall(t, repoRoot, statePath)
+
+	require.NoError(t, os.Chmod(statePath, 0o444))
+	t.Cleanup(func() { _ = os.Chmod(statePath, 0o644) })
+
+	resetInstallFlags()
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"uninstall", "mypkg",
+	)
+	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, err.Error(), "execute plan")
+}
+

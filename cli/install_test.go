@@ -52,6 +52,7 @@ sources = [{path = "cfg", mode = "file", target = "$HOME"}]
 func resetInstallFlags() {
 	flagProfile = ""
 	flagYes = false
+	flagSkipDeps = false
 	flagState = state.DefaultPath()
 	flagLogLevel = ""
 }
@@ -545,4 +546,107 @@ func TestInstall_EnsureDepsError(t *testing.T) {
 	_, statErr := os.Stat(statePath)
 	assert.True(t, os.IsNotExist(statErr),
 		"state.json must not be created when EnsureDependencies fails; statErr=%v", statErr)
+}
+
+// TestInstall_SkipDepsBypassesRunner asserts --skip-deps avoids invoking the
+// dependency runner entirely.
+func TestInstall_SkipDepsBypassesRunner(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	_, statePath, homeDir := setupDepsTestRepo(t)
+
+	mock := &deps.MockRunner{}
+	withMockDepsRunner(t, mock)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+		"--skip-deps",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Empty(t, mock.Calls, "deps runner must NOT be invoked with --skip-deps")
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	_, err = os.Lstat(link)
+	require.NoError(t, err, "symlink should exist")
+}
+
+// TestInstall_DepStateSaveError asserts that a state I/O failure during the
+// dependency-persistence step surfaces a wrapped error.
+func TestInstall_DepStateSaveError(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	_, _, _ = setupDepsTestRepo(t)
+
+	// Point --state at a path whose parent is a regular file → state.Load fails.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o644))
+	statePath := filepath.Join(blocker, "state.json")
+
+	withMockDepsRunner(t, &deps.MockRunner{})
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "load state",
+		"error must be wrapped with 'load state'; got: %v", err)
+}
+
+// TestInstall_DepSaveStateFailsAfterEnsure asserts that when EnsureDependencies
+// produces new InstalledDependencies but state.Save fails, the error is
+// wrapped with "save state".
+func TestInstall_DepSaveStateFailsAfterEnsure(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("dependency install path uses brew (no-root); skipping non-darwin runners")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses permission bits")
+	}
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	_, _, _ = setupDepsTestRepo(t)
+
+	stateDir := t.TempDir()
+	statePath := filepath.Join(stateDir, "state.json")
+	// Pre-create a read-only state file so Load succeeds but the subsequent
+	// Save's os.WriteFile(O_TRUNC) fails with EACCES.
+	require.NoError(t, os.WriteFile(statePath, []byte("{}"), 0o444))
+	t.Cleanup(func() { _ = os.Chmod(statePath, 0o644) })
+
+	mock := &deps.MockRunner{
+		Expectations: []deps.MockExpectation{
+			{
+				Argv:   []string{"nvim", "--version"},
+				Result: deps.RunResult{ExitCode: 1},
+			},
+			{
+				Argv:   []string{"brew", "install", "neovim"},
+				Result: deps.RunResult{ExitCode: 0},
+			},
+			{
+				Argv:   []string{"nvim", "--version"},
+				Result: deps.RunResult{ExitCode: 0, Combined: []byte("NVIM v0.10.0\n")},
+			},
+		},
+	}
+	withMockDepsRunner(t, mock)
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "save state",
+		"error must be wrapped with 'save state'; got: %v", err)
 }

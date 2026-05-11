@@ -753,3 +753,16 @@ func TestExecuteUninstallPlan_FolderModeLstatError(t *testing.T) {
 	// Resilient: must NOT error, just skip the unreachable target.
 	require.NoError(t, ExecuteUninstallPlan(p, statePath))
 }
+
+// TestUninstall_WrapperPropagatesBuildError covers the Uninstall wrapper's
+// Build-error branch: requesting an uninstall for a package that is not in
+// state must surface BuildUninstallPlan's error without touching state.
+func TestUninstall_WrapperPropagatesBuildError(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.json")
+	require.NoError(t, state.Save(statePath, state.State{}))
+
+	err := Uninstall(UninstallRequest{PackageName: "ghost", StatePath: statePath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not installed")
+}

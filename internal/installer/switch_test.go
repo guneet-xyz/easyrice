@@ -412,3 +412,95 @@ func TestSwitch_ConvenienceWrapperEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, fi2.Mode()&os.ModeSymlink)
 }
+
+// TestSwitch_WrapperPropagatesBuildError covers the Switch wrapper's
+// Build-error branch: switching a package that is not installed must
+// surface BuildSwitchPlan's "not installed" error.
+func TestSwitch_WrapperPropagatesBuildError(t *testing.T) {
+	repo := fixtureRepo(t)
+	homeDir := t.TempDir()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	require.NoError(t, state.Save(statePath, state.State{}))
+
+	err := Switch(SwitchRequest{
+		RepoRoot:    repo,
+		PackageName: "ghostty",
+		NewProfile:  "common",
+		CurrentOS:   runtime.GOOS,
+		HomeDir:     homeDir,
+		StatePath:   statePath,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not installed")
+}
+
+// TestSwitch_InstallFailsAfterUninstall drives BuildSwitchPlan +
+// ExecuteSwitchPlan and forces the install phase to fail AFTER uninstall has
+// succeeded by planting a regular file at the install target's parent
+// (between build and execute, so pre-flight conflict detection does not
+// short-circuit). The returned error must include the recovery hint, and
+// state must reflect the post-uninstall + failed-install reality (package
+// re-recorded under the NEW profile but with no created links).
+func TestSwitch_InstallFailsAfterUninstall(t *testing.T) {
+	req, initialResult := switchSetup(t, "macbook", "common")
+
+	sp, err := BuildSwitchPlan(req)
+	require.NoError(t, err)
+
+	blocker := filepath.Join(req.HomeDir, ".config", "ghostty")
+	require.NoError(t, os.RemoveAll(blocker))
+	require.NoError(t, os.MkdirAll(filepath.Dir(blocker), 0o755))
+	require.NoError(t, os.WriteFile(blocker, []byte("blocker"), 0o644))
+
+	err = ExecuteSwitchPlan(sp, req.StatePath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "uninstalled")
+	assert.Contains(t, err.Error(), "rice install")
+	assert.Contains(t, err.Error(), "ghostty")
+
+	for _, link := range initialResult.LinksCreated {
+		isOurs, checkErr := symlink.IsSymlinkTo(link.Target, link.Source)
+		if checkErr != nil {
+			continue
+		}
+		assert.False(t, isOurs, "old symlink %q must be gone after uninstall phase", link.Target)
+	}
+
+	st, err := state.Load(req.StatePath)
+	require.NoError(t, err)
+	pkg, ok := st["ghostty"]
+	require.True(t, ok, "package entry must remain after partial install (with new profile + empty links)")
+	assert.Equal(t, "common", pkg.Profile, "state profile must reflect attempted new profile")
+	assert.Empty(t, pkg.InstalledLinks, "no links created after install failure")
+}
+
+// TestSwitch_UninstallFailsFirst forces the uninstall phase to fail by
+// corrupting the state file between BuildSwitchPlan and ExecuteSwitchPlan.
+// Install must NOT be attempted: no new-profile-only symlinks should appear
+// and the recovery hint (which is only emitted post-uninstall) must NOT be
+// present in the error message.
+func TestSwitch_UninstallFailsFirst(t *testing.T) {
+	req, initialResult := switchSetup(t, "macbook", "common")
+
+	sp, err := BuildSwitchPlan(req)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(req.StatePath, []byte("{not valid json"), 0o644))
+
+	err = ExecuteSwitchPlan(sp, req.StatePath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "uninstall phase failed")
+	assert.NotContains(t, err.Error(), "rice install",
+		"recovery hint must NOT be emitted when uninstall fails first")
+
+	settings := filepath.Join(req.HomeDir, ".config", "ghostty", "settings")
+	_, statErr := os.Lstat(settings)
+	assert.True(t, os.IsNotExist(statErr),
+		"new-profile-only target %q must not exist when install was never attempted", settings)
+
+	for _, link := range initialResult.LinksCreated {
+		isOurs, checkErr := symlink.IsSymlinkTo(link.Target, link.Source)
+		require.NoError(t, checkErr)
+		assert.True(t, isOurs, "old symlink %q must remain since uninstall failed before any removal", link.Target)
+	}
+}
