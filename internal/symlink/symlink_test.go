@@ -275,3 +275,13 @@ func TestReadLink_HappyPath(t *testing.T) {
 		t.Errorf("ReadLink returned %q, want %q", dest, source)
 	}
 }
+
+func TestReadLink_ErrorOnNonExistentPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "nonexistent.txt")
+
+	_, err := ReadLink(target)
+	if err == nil {
+		t.Fatal("ReadLink should fail when path does not exist")
+	}
+}
