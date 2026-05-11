@@ -77,10 +77,16 @@ easyrice/
 | `logger.{Init,L,Sync,ParseLevel,Debug,Info,Warn,Error,Critical}` | func/var | `internal/logger/logger.go` | Global zap logger `L` |
 | `prompt.{RenderPlan,RenderSwitchPlan,RenderConflicts,Confirm}` | func | `internal/prompt/prompt.go` | TTY rendering + y/n |
 | `doctor.CheckLegacyState` | func | `internal/doctor/legacy_state.go` | Drift detection |
-| `updater.Updater`, `updater.CheckLatest`, `updater.Apply` | struct/func | `internal/updater/updater.go` | (placeholder — filled in T18) |
-| `updater.LoadCache`, `updater.SaveCache` | func | `internal/updater/types.go` | (placeholder — filled in T18) |
-| `updater.CleanupOrphans` | func | `internal/updater/cleanup.go` | (placeholder — filled in T18) |
-| `updater.ErrUpToDate`, `updater.ErrLocked` | var | `internal/updater/errors.go` | (placeholder — filled in T18) |
+| `updater.Updater`, `updater.New` | struct/func | `internal/updater/updater.go` | Self-update boundary; constructor validates `Owner`/`Repo` and sets defaults |
+| `updater.Options`, `updater.Release`, `updater.CheckResult` | struct | `internal/updater/types.go` | Configuration and result types for the updater |
+| `updater.DefaultCacheDir` | func | `internal/updater/types.go` | Returns `~/.config/easyrice` (POSIX) / `%APPDATA%/easyrice` (Windows) |
+| `updater.IsDevBuild`, `updater.IsNewer`, `updater.IsPreRelease` | func | `internal/updater/version.go` | Semver helpers (normalize + `golang.org/x/mod/semver`) |
+| `(*Updater).FetchLatest` | method | `internal/updater/fetch.go` | Anonymous GitHub release lookup via `go-selfupdate`; rejects pre-releases and assets without checksums.txt |
+| `(*Updater).Apply` | method | `internal/updater/swap.go` | Atomic binary swap; resolves symlinks, holds upgrade lock, never re-execs |
+| `(*Updater).CheckCached` | method | `internal/updater/cache.go` | 24h-TTL cached check; fail-silent on network errors |
+| `updater.FormatReminder`, `updater.ShouldShowReminder`, `updater.IsTerminal` | func | `internal/updater/reminder.go` | Pure helpers for the post-command update reminder |
+| `updater.CleanupOrphanArtifacts` | func | `internal/updater/cleanup.go` | Removes `.new`/`.old` siblings left by interrupted swaps |
+| `updater.ErrDevBuild`, `updater.ErrAlreadyLatest`, `updater.ErrLockBusy`, `updater.ErrNoChecksum`, `updater.ErrCacheCorrupt`, `updater.ErrInvalidSemver` | var | `internal/updater/errors.go` | Sentinel errors for CLI mapping |
 
 Dependency direction: `cli/` → {`installer/`, `repo/`} → {`manifest`, `profile`, `plan`, `symlink`, `state`, `logger`}. Never the reverse. `prompt`, `doctor`, `logger` are leaf packages.
 
@@ -241,6 +247,9 @@ make fmt
 - Accepting non-table forms for `sources` entries (e.g. bare string paths).
 - Bypassing `withinHome()` defense-in-depth check in installer.
 - Adding `golangci-lint` config or CI workflows without explicit request - intentionally minimal tooling.
+- Calling the GitHub API or `go-selfupdate` outside `internal/updater/` - the updater package owns ALL network I/O for releases.
+- Reading or writing `update-check.json` / `upgrade.lock` outside `internal/updater/` - go through the exported API.
+- Auto-restarting the binary after `upgrade` succeeds - we print a restart hint and exit; the user re-runs.
 
 ## TESTING
 

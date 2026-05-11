@@ -54,7 +54,19 @@ cli/
 `easyrice upgrade` self-updates the `easyrice` binary from the latest GitHub release. Delegates to `internal/updater`.
 
 - Command name is `upgrade` (NOT `update`). `update` pulls the dotfile repo; `upgrade` replaces the binary. Do not confuse them, do not alias them.
-- Flag: `--check` performs a check-only run (no swap), prints the latest available version vs. current, and exits 0.
-- File: `cli/upgrade.go` (+ `cli/upgrade_test.go`).
+- File: `cli/upgrade.go` (+ `cli/upgrade_test.go`). Shared reminder helper lives in `cli/reminder.go`.
 - MUST delegate all network I/O, file I/O, and binary-swap to `internal/updater`. No HTTP calls in `cli/`.
-- (placeholder — filled in T18 once `--check` and full flag set land in T13.)
+
+### Flags
+
+| Flag | Default | Behavior |
+|------|---------|----------|
+| `--check` | `false` | Performs a live API call to fetch the latest release, prints `current → latest` (or "up to date"), and exits 0. NEVER mutates the cache, NEVER applies the swap. |
+
+### Behavior
+
+- **Dev-build refusal:** if `updater.IsDevBuild(Version)` returns true, prints a message pointing the user at `go install` or the GitHub releases page and returns `updater.ErrDevBuild`. The binary is NEVER swapped in dev builds.
+- **Up-to-date path:** when `FetchLatest` returns `ErrAlreadyLatest`, or when `IsNewer(Version, release.Version)` returns false, prints `easyrice is up to date (<version>)` and returns nil (exit 0).
+- **Confirmation:** unless `--yes`/`-y` is set, prompts `Upgrade easyrice from <current> to <latest>?`. Cancellation prints `cancelled` and returns nil.
+- **Success message:** on a successful swap, prints `Upgraded easyrice to <version>. Restart easyrice to use the new version.` and exits 0.
+- **No auto-restart (decision):** the new binary is intentionally NOT re-execed. The user re-runs `easyrice` themselves. Reasoning: re-execing a freshly-swapped binary inside the same process invites argv/stdio/cwd surprises and complicates testing. The cost of one extra keystroke is worth the simplicity.
