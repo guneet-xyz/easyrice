@@ -57,7 +57,7 @@ func TestEnsureDependencies_VersionMismatch(t *testing.T) {
 				Description: "Neovim",
 				SupportedOS: []string{"linux", "darwin"},
 				Dependencies: []deps.DependencyRef{
-					{Name: "git", Version: ">=2.50.0"},
+					{Name: "node", Version: ">=20.0.0"},
 				},
 			},
 		},
@@ -66,10 +66,10 @@ func TestEnsureDependencies_VersionMismatch(t *testing.T) {
 	runner := &deps.MockRunner{
 		Expectations: []deps.MockExpectation{
 			{
-				Argv: []string{"git", "--version"},
+				Argv: []string{"node", "--version"},
 				Result: deps.RunResult{
 					ExitCode: 0,
-					Stdout:   []byte("git version 2.40.0"),
+					Combined: []byte("v18.0.0"),
 				},
 			},
 		},
@@ -79,11 +79,8 @@ func TestEnsureDependencies_VersionMismatch(t *testing.T) {
 
 	_, err := EnsureDependencies(ctx, runner, m, "nvim", false, s)
 
-	if err == nil {
-		t.Skip("version mismatch detection requires registry setup with version regex")
-	}
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "version mismatch")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ensure dependencies: version mismatch detected for package")
 }
 
 func TestEnsureDependencies_PackageNotFound(t *testing.T) {
