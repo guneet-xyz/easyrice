@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/creativeprojects/go-selfupdate"
 )
 
 // Package updater owns all version-check, GitHub-release fetch, binary swap, cache, and lockfile logic.
@@ -13,9 +15,10 @@ import (
 // validating checksums, managing the update cache with TTL, and coordinating atomic binary swaps.
 // The Updater type is injectable and carries state for HTTP client, cache directory, and GitHub credentials.
 type Updater struct {
-	opts    Options
-	fetcher releaseFetcher
-	swapper swapper
+	opts            Options
+	fetcher         releaseFetcher
+	swapper         swapper
+	sourceFactory   func() (selfupdate.Source, error)
 }
 
 // releaseFetcher abstracts release lookup behind an interface so callers can

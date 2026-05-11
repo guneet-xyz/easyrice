@@ -27,7 +27,13 @@ func (u *Updater) FetchLatest(ctx context.Context) (*Release, error) {
 
 func (u *Updater) fetchLatestFromGitHub(ctx context.Context) (*Release, error) {
 	// SECURITY: HTTPS only — see internal/updater/AGENTS.md
-	source, err := selfupdate.NewGitHubSource(selfupdate.GitHubConfig{})
+	factory := u.sourceFactory
+	if factory == nil {
+		factory = func() (selfupdate.Source, error) {
+			return selfupdate.NewGitHubSource(selfupdate.GitHubConfig{})
+		}
+	}
+	source, err := factory()
 	if err != nil {
 		return nil, fmt.Errorf("updater: configure github source: %w", err)
 	}
