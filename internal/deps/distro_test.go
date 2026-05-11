@@ -1,8 +1,11 @@
 package deps
 
 import (
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/guneet-xyz/easyrice/internal/testhelpers"
 )
 
 func TestDetectFrom(t *testing.T) {
@@ -156,5 +159,93 @@ func TestDetectFrom(t *testing.T) {
 				t.Errorf("DetectFrom(%q) = %+v, want %+v", tc.input, result, tc.expected)
 			}
 		})
+	}
+}
+
+// TestDetectFrom_Ubuntu tests DetectFrom with testhelpers.FakeOSRelease("ubuntu")
+func TestDetectFrom_Ubuntu(t *testing.T) {
+	reader := testhelpers.FakeOSRelease("ubuntu")
+	result := DetectFrom(reader)
+	expected := Platform{OS: "linux", DistroFamily: "debian"}
+	if result.OS != expected.OS || result.DistroFamily != expected.DistroFamily {
+		t.Errorf("DetectFrom(FakeOSRelease(\"ubuntu\")) = %+v, want %+v", result, expected)
+	}
+}
+
+// TestDetectFrom_Malformed tests DetectFrom with testhelpers.FakeOSReleaseMalformed
+func TestDetectFrom_Malformed(t *testing.T) {
+	reader := testhelpers.FakeOSReleaseMalformed()
+	result := DetectFrom(reader)
+	expected := Platform{OS: "linux", DistroFamily: "unknown"}
+	if result.OS != expected.OS || result.DistroFamily != expected.DistroFamily {
+		t.Errorf("DetectFrom(FakeOSReleaseMalformed()) = %+v, want %+v", result, expected)
+	}
+}
+
+// TestDetect_RuntimeBranch tests Detect() runtime branches
+func TestDetect_RuntimeBranch(t *testing.T) {
+	cases := []struct {
+		name     string
+		goos     string
+		expected Platform
+	}{
+		{
+			name:     "darwin branch",
+			goos:     "darwin",
+			expected: Platform{OS: "darwin"},
+		},
+		{
+			name:     "windows branch",
+			goos:     "windows",
+			expected: Platform{OS: "windows"},
+		},
+		{
+			name:     "unknown OS branch",
+			goos:     "freebsd",
+			expected: Platform{OS: "freebsd"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Only test the branch that matches the current runtime.GOOS
+			if runtime.GOOS != tc.goos {
+				t.Skipf("skipping %s test on %s", tc.goos, runtime.GOOS)
+			}
+
+			result := Detect()
+			if result.OS != tc.expected.OS {
+				t.Errorf("Detect() = %+v, want %+v", result, tc.expected)
+			}
+		})
+	}
+}
+
+// TestDetect_LinuxFileOpen tests Detect() on Linux
+func TestDetect_LinuxFileOpen(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("skipping Linux-specific test on %s", runtime.GOOS)
+	}
+
+	result := Detect()
+	if result.OS != "linux" {
+		t.Errorf("Detect() on Linux should return OS=linux, got %+v", result)
+	}
+	if result.DistroFamily == "" {
+		t.Errorf("Detect() on Linux should set DistroFamily, got empty string")
+	}
+}
+
+// TestDetect_LinuxFileOpenError verifies Detect() returns valid Platform on Linux
+func TestDetect_LinuxFileOpenError(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("skipping Linux-specific test on %s", runtime.GOOS)
+	}
+
+	_ = t.TempDir()
+
+	result := Detect()
+	if result.OS != "linux" {
+		t.Errorf("Detect() on Linux should return OS=linux, got %+v", result)
 	}
 }
