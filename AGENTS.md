@@ -1,45 +1,76 @@
 # AGENTS.md
 
-Guide for AI agents working in this repo. Covers conventions, schemas, and workflows for `easyrice`.
+Guide for AI agents working on `easyrice`. Conventions, schema, architecture.
 
-## Project Overview
+**Generated:** 2026-05-11 | **Commit:** aba7c0c | **Branch:** main
 
-`easyrice` is a cross-platform Go CLI dotfile manager. It replaces ad-hoc setups (GNU `stow` plus shell scripts) with a single binary that:
+## OVERVIEW
 
-- Reads per-package `rice.toml` manifests
-- Resolves the active **profile** (e.g. `macbook`, `devstick`)
-- Composes file **sources** into a flat tree
-- Installs files into `$HOME` (or any target) via symlinks
-- Tracks every link in a JSON **state file** so uninstall is exact and safe
+`easyrice` is a cross-platform Go CLI dotfile manager. Reads per-package `rice.toml` manifests, resolves a **profile**, composes **sources**, installs files into `$HOME` via symlinks, tracks every link in a JSON **state file** for exact uninstall.
 
-If you are adding a feature, prefer extending an existing `internal/` package over adding a new top-level dir.
+Module: `github.com/guneet-xyz/easyrice` | Go 1.26.2 | Deps: cobra, BurntSushi/toml, zap, testify.
 
-## Repo Structure
+## STRUCTURE
 
 ```
 easyrice/
-├── cli/                 # CLI entrypoint and cobra commands (package main)
-│   └── main.go, root.go, install.go, switch.go, uninstall.go, status.go, doctor.go, version.go
+├── cli/             # cobra commands, package main (see cli/AGENTS.md)
 ├── internal/
-│   ├── manifest/        # rice.toml parsing + schema
-│   ├── profile/         # profile resolution + source composition
-│   ├── plan/            # planned link operations (dry-run model)
-│   ├── installer/       # apply install/uninstall plans
-│   ├── symlink/         # low-level symlink ops (create, verify, remove)
-│   ├── state/           # state.json read/write
-│   ├── logger/          # zap-backed leveled logger
-│   ├── doctor/          # health checks (broken links, drift)
-│   └── prompt/          # interactive yes/no confirmation
-├── testdata/            # fixtures for tests (mirrors real package layouts)
+│   ├── manifest/    # rice.toml parsing/validation/OS gating (see internal/manifest/AGENTS.md)
+│   ├── profile/     # ResolveSpecs(): profile name → []SourceSpec
+│   ├── plan/        # pure data types: Op, Conflict, Plan
+│   ├── installer/   # plan→execute for install/uninstall/switch (see internal/installer/AGENTS.md)
+│   ├── symlink/     # low-level FS ops (see internal/symlink/AGENTS.md)
+│   ├── state/       # state.json read/write
+│   ├── logger/      # zap tee: console + file (debug always to file)
+│   ├── doctor/      # health checks (legacy state detection)
+│   └── prompt/      # RenderPlan, RenderSwitchPlan, RenderConflicts, Confirm
+├── testdata/        # fixtures (testdata/manifest, testdata/manifest_valid, testdata/install)
+├── Makefile         # build / install / test / vet / fmt / clean
 ├── go.mod
-└── AGENTS.md            # you are here
+└── AGENTS.md        # this file
 ```
 
-Go module path: `github.com/guneet-xyz/easyrice`.
+## WHERE TO LOOK
+
+| Task | File |
+|------|------|
+| Add a CLI command | `cli/<name>.go` + register in `init()` via `rootCmd.AddCommand` |
+| Change persistent flags | `cli/root.go` |
+| Change rice.toml schema | `internal/manifest/schema.go` + `internal/manifest/validate.go` |
+| Change install/overlay/folder-mode logic | `internal/installer/install.go` (BuildInstallPlan) |
+| Change conflict semantics | `internal/installer/conflict.go` (DetectConflicts) |
+| Change uninstall behavior | `internal/installer/uninstall.go` |
+| Change switch atomicity | `internal/installer/switch.go` |
+| Change state.json shape | `internal/state/state.go` (`InstalledLink`, `PackageState`, `State`) |
+| Change log levels / output | `internal/logger/logger.go` |
+| Add health check | `internal/doctor/` |
+| Change prompt rendering | `internal/prompt/prompt.go` |
+
+## CODE MAP
+
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `Manifest`, `ProfileDef`, `SourceSpec` | struct | `internal/manifest/schema.go` | rice.toml schema |
+| `manifest.Load`, `manifest.Discover` | func | `internal/manifest/load.go` | Parse one package / scan repo |
+| `manifest.Validate`, `manifest.CheckOS` | func | `internal/manifest/{validate,osgating}.go` | Schema + OS gate |
+| `profile.ResolveSpecs` | func | `internal/profile/profile.go` | profile name → ordered `[]SourceSpec` |
+| `plan.Op`, `plan.Plan`, `plan.Conflict` | struct | `internal/plan/plan.go` | Dry-run model (data only) |
+| `installer.Install` / `Uninstall` / `Switch` | func | `internal/installer/` | High-level orchestration |
+| `installer.BuildInstallPlan` / `ExecuteInstallPlan` | func | `internal/installer/install.go` | Plan/execute split |
+| `installer.DetectConflicts` | func | `internal/installer/conflict.go` | Idempotent conflict check |
+| `symlink.{Create,Remove,IsSymlinkTo,ReadLink}` | func | `internal/symlink/symlink.go` | FS primitives |
+| `state.{Load,Save,DefaultPath}` | func | `internal/state/state.go` | state.json I/O |
+| `state.State` (= `map[string]PackageState`) | type | `internal/state/state.go` | Source of truth for uninstall |
+| `logger.{Init,L,Sync,ParseLevel,Debug,Info,Warn,Error,Critical}` | func/var | `internal/logger/logger.go` | Global zap logger `L` |
+| `prompt.{RenderPlan,RenderSwitchPlan,RenderConflicts,Confirm}` | func | `internal/prompt/prompt.go` | TTY rendering + y/n |
+| `doctor.CheckLegacyState` | func | `internal/doctor/legacy_state.go` | Drift detection |
+
+Dependency direction: `cli/` → `installer/` → {`manifest`, `profile`, `plan`, `symlink`, `state`, `logger`}. Never the reverse. `prompt`, `doctor`, `logger` are leaf packages.
 
 ## rice.toml Schema
 
-Every dotfile package directory consumed by `easyrice` has a `rice.toml` at its root. Schema lives in `internal/manifest/schema.go`.
+Every dotfile package has `rice.toml` at its root. Schema in `internal/manifest/schema.go`.
 
 ```toml
 schema_version = 1
@@ -52,175 +83,131 @@ sources = [{path = "common", mode = "file", target = "$HOME"}]
 
 [profiles.macbook]
 sources = [
-  {path = "common", mode = "file", target = "$HOME"},
+  {path = "common",  mode = "file", target = "$HOME"},
   {path = "macbook", mode = "file", target = "$HOME"},
 ]
 ```
 
-### Fields
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `schema_version` | int | yes | Currently `1`. Bump only on breaking changes. |
+| `name` | string | yes | Should match the directory name. |
+| `description` | string | no | Short human description. |
+| `supported_os` | []string | yes | Package-level OS gate. Values: `linux`, `darwin`, `windows`. |
+| `profile_key` | string | no | Reserved for future per-package overrides. |
+| `profiles.<name>.sources` | []table | yes | Inline table form ONLY. Each: `path`, `mode`, `target` (all required). |
 
-| Field             | Type                | Required | Notes                                                            |
-|-------------------|---------------------|----------|------------------------------------------------------------------|
-| `schema_version`  | int                 | yes      | Currently `1`. Bump only on breaking schema changes.             |
-| `name`            | string              | yes      | Package name. Should match the directory name.                   |
-| `description`     | string              | no       | Short human-readable description.                                |
-| `supported_os`    | []string            | yes      | OS gate at package level. Values: `linux`, `darwin`, `windows`.  |
-| `profile_key`     | string              | no       | Reserved for future per-package profile overrides.               |
-| `profiles.<name>` | table               | yes      | One or more profiles. At least `common` is conventional.         |
-| `profiles.<name>.sources` | []table | yes      | List of source tables. Each entry requires `path` (relative subdir), `mode` (`"file"` or `"folder"`), and `target` (absolute destination root, env vars expanded). |
+`SourceSpec.UnmarshalTOML` rejects non-table forms - DO NOT accept bare strings.
 
-`sources` are relative to the package directory. Each source table specifies how files are installed.
+### Source modes
 
-## Source Spec
+- **`file`** (overlayable): walk source dir, symlink each file under `target`. Later sources override earlier ones (last-wins) on identical relative paths.
+- **`folder`** (single symlink, NOT overlayable): symlink the entire source dir as one unit to `target`. Cannot be combined with another source touching the same target subtree.
 
-Each source entry in the `sources` list is a table with three required fields:
+`target` supports `os.ExpandEnv` (e.g. `"$HOME"`, `"$HOME/.config/nvim"`).
 
-- **`path`**: Relative path to the source directory within the package (e.g., `"common"`, `".config/nvim"`).
-- **`mode`**: Installation mode:
-  - `"file"`: Walk the source directory and symlink each file individually under `target`. Files from multiple sources are overlaid.
-  - `"folder"`: Symlink the entire source directory as a single unit to `target`. Cannot be overlaid by other sources in the same profile.
-- **`target`**: Absolute destination root where files are installed. Supports environment variable expansion (e.g., `"$HOME"`, `"$HOME/.config"`).
+### Profile conventions
 
-### File-mode example (default, overlayable):
-
-```toml
-[profiles.common]
-sources = [
-  {path = "common", mode = "file", target = "$HOME"},
-  {path = "macbook", mode = "file", target = "$HOME"},
-]
-```
-
-This installs files from `common/` and `macbook/` into `$HOME`, with `macbook/` overlaying `common/`.
-
-### Folder-mode example (single symlink, not overlayable):
-
-```toml
-[profiles.common]
-sources = [{path = ".config/nvim", mode = "folder", target = "$HOME/.config/nvim"}]
-```
-
-This symlinks `<repo>/nvim/.config/nvim` as a single unit to `$HOME/.config/nvim`. Folder-mode sources are ideal for tools like nvim and opencode that manage their entire config directory.
-
-## Profile Conventions
-
-Standard profile names (use these unless you have a strong reason not to):
-
-- `common`   — shared baseline used by every machine
-- `macbook`  — personal MacBook overlay
-- `devstick` — Linux dev box / portable USB rig
-- `personal` — personal-only tweaks (cross-machine)
-- `work`     — work-only tweaks
-
-Profiles compose by listing sources. To make a new machine variant, add a new profile that lists `common` first, then your overlay:
+`common`, `macbook`, `devstick`, `personal`, `work`. Compose by listing `common` first, then overlay:
 
 ```toml
 [profiles.workmac]
 sources = [
-  {path = "common", mode = "file", target = "$HOME"},
+  {path = "common",  mode = "file", target = "$HOME"},
   {path = "macbook", mode = "file", target = "$HOME"},
-  {path = "work", mode = "file", target = "$HOME"},
+  {path = "work",    mode = "file", target = "$HOME"},
 ]
 ```
 
-## OS Gating
-
-Two layers:
-
-1. **Package level** via `supported_os`. If the current OS is not in the list, the package is skipped entirely (with a warning).
-2. **Profile level** via `os` on a profile (reserved field, see schema). Currently profiles inherit from the package-level gate.
-
-Valid OS values: `linux`, `darwin`, `windows`. Detected via Go's `runtime.GOOS`.
-
 ## State File
 
-Location (resolved by `state.DefaultPath()`):
+| OS | Path |
+|----|------|
+| linux/darwin | `~/.config/easyrice/state.json` |
+| windows | `%APPDATA%/easyrice/state.json` |
 
-- POSIX (`linux`, `darwin`): `~/.config/easyrice/state.json`
-- Windows: `%APPDATA%/easyrice/state.json`
-
-Override with `--state /path/to/state.json` on any command.
-
-Format: a JSON object keyed by package name.
+Override with `--state /path`. Format: JSON object keyed by package name (`map[string]PackageState`). NEVER hand-edit; use the CLI.
 
 ```json
 {
   "ghostty": {
     "profile": "macbook",
     "installed_links": [
-      {
-        "source": "/Users/me/code/rice/ghostty/common/config",
-        "target": "/Users/me/.config/ghostty/config"
-      }
+      { "source": "/abs/repo/ghostty/common/config", "target": "/abs/$HOME/.config/ghostty/config" }
     ],
     "installed_at": "2025-05-10T12:34:56Z"
   }
 }
 ```
 
-The state file is the source of truth for `uninstall` and `switch`. Never hand-edit it; use the CLI.
+State is the source of truth for `uninstall` and `switch`. Symlinks are absolute, pointing back into the dotfile repo.
 
-## CLI Commands
+## CLI Surface
 
-All commands accept the persistent flags below.
+Persistent flags (defined in `cli/root.go`):
 
-### Persistent flags
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--repo` | `.` | Path to dotfile repo |
+| `--state` | `state.DefaultPath()` | Path to state.json |
+| `--log-level` | `warn` | `debug`/`info`/`warn`/`error`/`critical` |
+| `--yes`, `-y` | `false` | Skip confirmation prompts |
 
-| Flag           | Default                | Purpose                                          |
-|----------------|------------------------|--------------------------------------------------|
-| `--repo`       | `.`                    | Path to the dotfile repo                         |
-| `--state`      | `state.DefaultPath()`  | Path to state.json                               |
-| `--log-level`  | `warn`                 | `debug` / `info` / `warn` / `error` / `critical` |
-| `--yes`, `-y`  | `false`                | Skip interactive confirmation prompts            |
-
-Env var: `EASYRICE_LOG_LEVEL` sets the log level. The `--log-level` flag wins over the env var.
-
-### Commands
+Env: `EASYRICE_LOG_LEVEL` sets log level. Flag wins over env.
 
 ```sh
-easyrice install <package> --profile <name>   # install a package under a profile
-easyrice uninstall <package>                  # remove all links recorded in state
-easyrice switch <package> --profile <name>    # uninstall current profile, install new
-easyrice status                               # show installed packages, profiles, drift
-easyrice doctor                               # detect broken links, missing sources
+easyrice install   <package> --profile <name>
+easyrice uninstall <package>
+easyrice switch    <package> --profile <name>
+easyrice status    [package]
+easyrice doctor
+easyrice version
 ```
 
-Examples:
+## COMMANDS
 
 ```sh
-easyrice install ghostty --profile macbook --repo ~/code/rice
-easyrice switch nvim --profile work -y
-easyrice status --log-level info
-EASYRICE_LOG_LEVEL=debug easyrice doctor
+make build      # ./easyrice
+make install    # $(GOPATH)/bin/easyrice + rice symlink
+make test       # go test -race -count=1 ./...
+make vet
+make fmt
 ```
 
-## Logging
+## CONVENTIONS
 
-Five levels, in order of verbosity:
+- Errors wrap with `fmt.Errorf("context: %w", err)` - always.
+- No `panic` outside `main`; return errors.
+- Exported types live under `internal/` (binary is the only consumer).
+- Symlinks are **absolute**, pointing into the dotfile repo.
+- All FS ops MUST go through `internal/symlink` - never `os.Symlink` directly outside that package.
+- Logger is global (`logger.L`); call `logger.Init()` once in `PersistentPreRunE`.
+- Tests: `t.TempDir()` for isolation, table-driven default, fixtures under `testdata/`.
 
-`debug` < `info` < `warn` (default) < `error` < `critical`
+## ANTI-PATTERNS (forbidden in this repo)
 
-Set with `--log-level` or `EASYRICE_LOG_LEVEL`. Logs are written via `internal/logger` (zap). A persistent log file lives at `logger.DefaultLogPath()` (typically `~/.config/easyrice/logs/easyrice.log` on POSIX).
+- Writing into real `$HOME` from tests - use `t.TempDir()` + `--state` to a temp file.
+- Hand-editing `state.json` - use the CLI.
+- Adding a new top-level dir before extending an existing `internal/` package.
+- Calling `os.Symlink` / `os.Readlink` outside `internal/symlink/`.
+- Accepting non-table forms for `sources` entries (e.g. bare string paths).
+- Bypassing `withinHome()` defense-in-depth check in installer.
+- Adding `golangci-lint` config or CI workflows without explicit request - intentionally minimal tooling.
 
-## Testing Conventions
+## TESTING
 
-- **Always run with the race detector**: `go test -race ./...`
-- **Table-driven tests** are the default style. One `for _, tc := range cases` loop per behavior.
-- **Fixtures** live under `testdata/`. Mirror the real package layout (`testdata/install/mypkg/rice.toml`, etc.). `testdata/` is ignored by the Go toolchain, so it's safe for arbitrary files.
-- **Temp dirs**: use `t.TempDir()`. Never write into the real `$HOME` from tests.
-- **State paths in tests**: pass `--state` explicitly to a temp file. Same for `--repo`.
+- ALWAYS `go test -race ./...` (Makefile already enforces).
+- Table-driven default: `for _, tc := range cases { t.Run(tc.name, ...) }`.
+- Fixtures mirror real package layout under `testdata/<scenario>/<pkg>/rice.toml`. `testdata/` is ignored by Go toolchain.
+- Pass `--state` to a temp file in tests; never the real default path.
+- Use `t.Helper()` on test helpers; `t.TempDir()` auto-cleans.
 
-Run a single package's tests:
+## NOTES / GOTCHAS
 
-```sh
-go test -race ./internal/installer/...
-```
-
-## Conventions Summary
-
-- Go module: `github.com/guneet-xyz/easyrice`
-- Go version: see `go.mod`
-- All exported types live under `internal/` (the binary is the only consumer)
-- Errors wrap with `fmt.Errorf("context: %w", err)`
-- No `panic` outside `main`; return errors
-- Symlinks are absolute, pointing back into the dotfile repo
+- `withinHome(target, home)` enforces install targets stay inside `$HOME` (defense in depth in `internal/installer/install.go`).
+- `rice.toml` files inside source trees are skipped during walk - by design.
+- Symlinks inside source trees are skipped during walk - we only manage real files.
+- `folder` mode op does NOT participate in file-mode last-wins overlay.
+- Windows `os.Symlink` requires Developer Mode or admin - runtime check belongs in `doctor/`, NOT in `symlink/`.
+- `logger.L` is a `zap.NewNop()` until `Init()` is called - safe to call before init, just silent.
+- File logger ALWAYS at DebugLevel regardless of console level (tee).
