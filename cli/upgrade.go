@@ -27,12 +27,7 @@ func init() {
 	rootCmd.AddCommand(upgradeCmd)
 }
 
-func runUpgrade(cmd *cobra.Command, args []string) error {
-	if updater.IsDevBuild(Version) {
-		fmt.Fprintln(os.Stderr, "easyrice is a dev build; cannot self-upgrade. Reinstall via `go install github.com/guneet-xyz/easyrice/cli@latest` or download a release from https://github.com/guneet-xyz/easyrice/releases")
-		return fmt.Errorf("upgrade: %w", updater.ErrDevBuild)
-	}
-
+var upgradeFetchFn = func(ctx context.Context) (*updater.Updater, *updater.Release, error) {
 	u, err := updater.New(updater.Options{
 		Owner:    "guneet-xyz",
 		Repo:     "easyrice",
@@ -40,13 +35,26 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		CacheDir: updater.DefaultCacheDir(),
 	})
 	if err != nil {
-		return fmt.Errorf("upgrade: %w", err)
+		return nil, nil, err
+	}
+	rel, err := u.FetchLatest(ctx)
+	return u, rel, err
+}
+
+var upgradeApplyFn = func(ctx context.Context, u *updater.Updater, rel *updater.Release) error {
+	return u.Apply(ctx, rel)
+}
+
+func runUpgrade(cmd *cobra.Command, args []string) error {
+	if updater.IsDevBuild(Version) {
+		fmt.Fprintln(os.Stderr, "easyrice is a dev build; cannot self-upgrade. Reinstall via `go install github.com/guneet-xyz/easyrice/cli@latest` or download a release from https://github.com/guneet-xyz/easyrice/releases")
+		return fmt.Errorf("upgrade: %w", updater.ErrDevBuild)
 	}
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	release, err := u.FetchLatest(ctx)
+	u, release, err := upgradeFetchFn(ctx)
 	if err != nil {
 		if errors.Is(err, updater.ErrAlreadyLatest) {
 			fmt.Fprintf(cmd.OutOrStdout(), "easyrice is up to date (%s)\n", Version)
@@ -77,7 +85,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := u.Apply(ctx, release); err != nil {
+	if err := upgradeApplyFn(ctx, u, release); err != nil {
 		return fmt.Errorf("upgrade failed: %w", err)
 	}
 

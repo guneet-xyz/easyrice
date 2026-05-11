@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
+	"github.com/guneet-xyz/easyrice/internal/updater"
 )
 
 func setupDoctorRepo(t *testing.T) {
@@ -148,4 +150,62 @@ func TestDoctor_AllPass(t *testing.T) {
 	assert.Contains(t, out, "[OK] git available")
 	assert.Contains(t, out, "[OK] repo initialized")
 	assert.Contains(t, out, "All checks passed.")
+}
+
+func TestDoctorReminderAppendedOnHealthyTTY(t *testing.T) {
+	saveReminderState(t)
+	resetInstallFlags()
+	setupDoctorRepo(t)
+	Version = "v1.0.0"
+	reminderTTYFn = func() bool { return true }
+	reminderCheckFn = func(ctx context.Context, current string) (*updater.CheckResult, error) {
+		return &updater.CheckResult{
+			Current:         current,
+			Latest:          "v2.0.0",
+			UpdateAvailable: true,
+		}, nil
+	}
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	stderr := captureStderr(t, func() {
+		out, err := runInstallCmd(t, "",
+			"--state", statePath,
+			"doctor",
+		)
+		require.NoError(t, err, "out=%s", out)
+		assert.Contains(t, out, "All checks passed.")
+	})
+
+	assert.Contains(t, stderr, "A new release of easyrice is available")
+	assert.Contains(t, stderr, "v2.0.0")
+}
+
+func TestDoctorNoReminderOnFailure(t *testing.T) {
+	saveReminderState(t)
+	resetInstallFlags()
+	setIsolatedHome(t)
+	Version = "v1.0.0"
+	reminderTTYFn = func() bool { return true }
+	checkCalled := false
+	reminderCheckFn = func(ctx context.Context, current string) (*updater.CheckResult, error) {
+		checkCalled = true
+		return &updater.CheckResult{Latest: "v2.0.0", UpdateAvailable: true}, nil
+	}
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	stderr := captureStderr(t, func() {
+		out, err := runInstallCmd(t, "",
+			"--state", statePath,
+			"doctor",
+		)
+		require.Error(t, err, "out=%s", out)
+		assert.Contains(t, out, "issue(s) found")
+	})
+
+	assert.False(t, checkCalled, "reminder check must NOT run when doctor reports issues")
+	assert.NotContains(t, stderr, "A new release")
 }

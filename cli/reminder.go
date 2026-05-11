@@ -11,17 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// maybePrintUpdateReminder checks the update cache and prints a reminder to
-// stderr if a newer version is available, the user hasn't opted out, and
-// stderr is a TTY. It is fail-silent: errors are logged at Debug only.
-func maybePrintUpdateReminder() {
-	if UpdateCheckDisabled() {
-		return
-	}
-	tty := updater.IsTerminal(os.Stderr)
-	if !updater.ShouldShowReminder(false, Version, tty) {
-		return
-	}
+// reminderTTYFn returns whether stderr is a TTY. Overridable in tests.
+var reminderTTYFn = func() bool { return updater.IsTerminal(os.Stderr) }
+
+// reminderCheckFn returns the cached update-check result. Overridable in tests
+// to avoid touching the network.
+var reminderCheckFn = func(ctx context.Context, current string) (*updater.CheckResult, error) {
 	u, err := updater.New(updater.Options{
 		Owner:    "guneet-xyz",
 		Repo:     "easyrice",
@@ -29,12 +24,25 @@ func maybePrintUpdateReminder() {
 		CacheDir: updater.DefaultCacheDir(),
 	})
 	if err != nil {
-		logger.L.Debug("update check: failed to create updater", zap.Error(err))
+		return nil, err
+	}
+	return u.CheckCached(ctx, current)
+}
+
+// maybePrintUpdateReminder checks the update cache and prints a reminder to
+// stderr if a newer version is available, the user hasn't opted out, and
+// stderr is a TTY. It is fail-silent: errors are logged at Debug only.
+func maybePrintUpdateReminder() {
+	if UpdateCheckDisabled() {
+		return
+	}
+	tty := reminderTTYFn()
+	if !updater.ShouldShowReminder(false, Version, tty) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	result, err := u.CheckCached(ctx, Version)
+	result, err := reminderCheckFn(ctx, Version)
 	if err != nil {
 		logger.L.Debug("update check: cache error", zap.Error(err))
 		return
