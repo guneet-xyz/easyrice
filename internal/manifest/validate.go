@@ -65,9 +65,16 @@ func Validate(m *Manifest) error {
 				return fmt.Errorf("validate: package %q: profile name must not be empty", name)
 			}
 
-			// Validate Sources
-			if len(profile.Sources) == 0 {
-				return fmt.Errorf("validate: package %q: profile %q has no sources", name, profileName)
+			// Validate Import (if present)
+			if profile.Import != "" {
+				if _, err := ParseImportSpec(profile.Import); err != nil {
+					return fmt.Errorf("validate: package %q: profile %q: import: %w", name, profileName, err)
+				}
+			}
+
+			// Validate Sources and Import: must have at least one
+			if len(profile.Sources) == 0 && profile.Import == "" {
+				return fmt.Errorf("validate: package %q: profile %q: must have at least one source or an import", name, profileName)
 			}
 
 			for i, source := range profile.Sources {

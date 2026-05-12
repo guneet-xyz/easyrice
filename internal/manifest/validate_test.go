@@ -354,7 +354,7 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErr:   true,
-			errSubstr: "has no sources",
+			errSubstr: "must have at least one source or an import",
 		},
 
 		// Negative: empty source path
