@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -157,10 +158,130 @@ func TestInstall_StdinNoAborts(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "symlink should NOT exist; lstat err=%v", err)
 }
 
-func TestInstall_NoArgsErrors(t *testing.T) {
+func TestInstall_NoArgs_ConvergesAll(t *testing.T) {
 	resetInstallFlags()
-	_, err := runInstallCmd(t, "", "install")
-	require.Error(t, err)
+	t.Cleanup(resetInstallFlags)
+	homeDir := setIsolatedHome(t)
+	repoRoot := repo.DefaultRepoPath()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	for _, p := range []string{"pkg1", "pkg2"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(repoRoot, p, "common"), 0o755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(repoRoot, p, "common", p+".conf"),
+			[]byte("k=v\n"), 0o644))
+	}
+	manifest := `schema_version = 1
+
+[packages.pkg1]
+supported_os = ["linux", "darwin", "windows"]
+[packages.pkg1.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME"}]
+
+[packages.pkg2]
+supported_os = ["linux", "darwin", "windows"]
+[packages.pkg2.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Installed: pkg1")
+	assert.Contains(t, out, "Installed: pkg2")
+
+	for _, p := range []string{"pkg1", "pkg2"} {
+		_, err := os.Lstat(filepath.Join(homeDir, p+".conf"))
+		require.NoError(t, err, "symlink for %s missing", p)
+	}
+}
+
+func TestInstall_ProfileSwitch(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Installed: mypkg (profile: common)")
+
+	resetInstallFlags()
+	out, err = runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "macbook",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Switched: mypkg from common to macbook")
+
+	st, err := state.Load(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, "macbook", st["mypkg"].Profile, "stored profile must be updated")
+}
+
+func TestInstall_DirtyWarn(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+	repoRoot := repo.DefaultRepoPath()
+
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.email", "t@t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.name", "t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "add", ".").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "commit", "-m", "initial").Run())
+
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "dirty.txt"), []byte("dirty\n"), 0o644))
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "install must proceed despite dirty repo; out=%s", out)
+	assert.Contains(t, out, "Warning: rice repo at "+repoRoot)
+	assert.Contains(t, out, "Installed: mypkg")
+}
+
+func TestInstall_NoCommit(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+	repoRoot := repo.DefaultRepoPath()
+
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.email", "t@t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.name", "t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "add", ".").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "commit", "-m", "initial").Run())
+
+	before, err := exec.Command("git", "-C", repoRoot, "rev-list", "--count", "HEAD").Output()
+	require.NoError(t, err)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	after, err := exec.Command("git", "-C", repoRoot, "rev-list", "--count", "HEAD").Output()
+	require.NoError(t, err)
+	assert.Equal(t, strings.TrimSpace(string(before)), strings.TrimSpace(string(after)),
+		"install must NOT create a commit")
 }
 
 func TestInstall_ShowsConflictDetails(t *testing.T) {
@@ -649,4 +770,81 @@ func TestInstall_DepSaveStateFailsAfterEnsure(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "save state",
 		"error must be wrapped with 'save state'; got: %v", err)
+}
+
+func TestInstall_SwitchingMessage(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	resetInstallFlags()
+	out, err = runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "macbook",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Switching mypkg: common → macbook")
+}
+
+func TestInstall_RepairMessage(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, homeDir := setupTestRepo(t)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+
+	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
+	require.NoError(t, os.Remove(link), "remove symlink to simulate broken link")
+
+	resetInstallFlags()
+	out, err = runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Repairing mypkg")
+	assert.Contains(t, out, "broken links")
+}
+
+func TestInstall_DirtyWarningIncludesPath(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	_, statePath, _ := setupTestRepo(t)
+	repoRoot := repo.DefaultRepoPath()
+
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.email", "t@t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "config", "user.name", "t").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "add", ".").Run())
+	require.NoError(t, exec.Command("git", "-C", repoRoot, "commit", "-m", "initial").Run())
+
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "dirty.txt"), []byte("dirty\n"), 0o644))
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "mypkg",
+		"--profile", "common",
+	)
+	require.NoError(t, err, "install must proceed despite dirty repo; out=%s", out)
+	assert.Contains(t, out, "Warning: rice repo at "+repoRoot)
+	assert.Contains(t, out, "cd "+repoRoot+" && git status")
 }
