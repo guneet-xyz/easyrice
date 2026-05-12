@@ -113,3 +113,80 @@ sources = [{path = "config", mode = "file", target = "$HOME/.config/myapp"}]
 	assert.Equal(t, "foo", myapp.Dependencies[0].Name)
 	assert.Equal(t, ">=1.0.0", myapp.Dependencies[0].Version)
 }
+
+func TestSchema_ProfileWithImport(t *testing.T) {
+	tomlStr := `schema_version = 1
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.nvim.profiles.default]
+import = "remotes/kick#nvim.default"
+`
+
+	var m Manifest
+	_, err := toml.Decode(tomlStr, &m)
+	require.NoError(t, err, "failed to decode TOML with import")
+
+	nvim, ok := m.Packages["nvim"]
+	require.True(t, ok, "nvim package not found")
+
+	defaultProfile, ok := nvim.Profiles["default"]
+	require.True(t, ok, "default profile not found")
+
+	assert.Equal(t, "remotes/kick#nvim.default", defaultProfile.Import)
+	assert.Len(t, defaultProfile.Sources, 0)
+}
+
+func TestSchema_ProfileWithoutImport(t *testing.T) {
+	tomlStr := `schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal"
+supported_os = ["darwin"]
+
+[packages.ghostty.profiles.macbook]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/ghostty"}]
+`
+
+	var m Manifest
+	_, err := toml.Decode(tomlStr, &m)
+	require.NoError(t, err, "failed to decode TOML without import")
+
+	ghostty, ok := m.Packages["ghostty"]
+	require.True(t, ok, "ghostty package not found")
+
+	macbook, ok := ghostty.Profiles["macbook"]
+	require.True(t, ok, "macbook profile not found")
+
+	assert.Equal(t, "", macbook.Import)
+	assert.Len(t, macbook.Sources, 1)
+}
+
+func TestSchema_ProfileWithBothImportAndSources(t *testing.T) {
+	tomlStr := `schema_version = 1
+
+[packages.zsh]
+description = "Zsh configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.zsh.profiles.workmac]
+import = "remotes/base#zsh.common"
+sources = [{path = "work", mode = "file", target = "$HOME"}]
+`
+
+	var m Manifest
+	_, err := toml.Decode(tomlStr, &m)
+	require.NoError(t, err, "failed to decode TOML with both import and sources")
+
+	zsh, ok := m.Packages["zsh"]
+	require.True(t, ok, "zsh package not found")
+
+	workmac, ok := zsh.Profiles["workmac"]
+	require.True(t, ok, "workmac profile not found")
+
+	assert.Equal(t, "remotes/base#zsh.common", workmac.Import)
+	assert.Len(t, workmac.Sources, 1)
+	assert.Equal(t, "work", workmac.Sources[0].Path)
+}

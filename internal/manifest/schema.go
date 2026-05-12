@@ -28,8 +28,13 @@ type PackageDef struct {
 }
 
 // ProfileDef represents a single profile within a PackageDef.
+// Import is optional; if set, it references a profile in a remote rice using the
+// syntax "remotes/<name>#<pkg>.<profile>". Imported sources are resolved first;
+// local Sources (if any) are overlaid AFTER using last-wins file-mode rules.
+// Both Import and Sources may be present simultaneously.
 type ProfileDef struct {
 	Sources []SourceSpec `toml:"sources"`
+	Import  string       `toml:"import,omitempty"`
 }
 
 // SourceSpec describes a single source entry under a profile. It accepts only
