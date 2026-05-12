@@ -22,6 +22,17 @@ func RepoTomlPath(repoRoot string) string {
 	return filepath.Join(repoRoot, "rice.toml")
 }
 
+// RemotesDir returns the path to the remotes directory within the managed repo.
+// All remote rice submodules live under this directory.
+func RemotesDir(repoRoot string) string {
+	return filepath.Join(repoRoot, "remotes")
+}
+
+// RemoteTomlPath returns the path to the rice.toml of a named remote rice.
+func RemoteTomlPath(repoRoot, name string) string {
+	return filepath.Join(RemotesDir(repoRoot), name, "rice.toml")
+}
+
 func Exists(repoPath string) (bool, error) {
 	_, err := os.Stat(repoPath)
 	if err == nil {

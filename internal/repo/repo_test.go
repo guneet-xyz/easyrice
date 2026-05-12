@@ -255,3 +255,74 @@ func TestPull_ContextCancelled(t *testing.T) {
 		t.Fatalf("error %q should mention context or wrap context.Canceled", err.Error())
 	}
 }
+
+func TestRemotePaths(t *testing.T) {
+	cases := []struct {
+		name     string
+		repoRoot string
+		remoteName string
+		wantRemotesDir string
+		wantRemoteToml string
+	}{
+		{
+			name:           "simple path",
+			repoRoot:       "/x",
+			remoteName:     "kick",
+			wantRemotesDir: "/x/remotes",
+			wantRemoteToml: "/x/remotes/kick/rice.toml",
+		},
+		{
+			name:           "nested repo root",
+			repoRoot:       "/home/user/.config/easyrice/repos/default",
+			remoteName:     "work",
+			wantRemotesDir: "/home/user/.config/easyrice/repos/default/remotes",
+			wantRemoteToml: "/home/user/.config/easyrice/repos/default/remotes/work/rice.toml",
+		},
+		{
+			name:           "remote with dashes",
+			repoRoot:       "/tmp/repo",
+			remoteName:     "my-remote",
+			wantRemotesDir: "/tmp/repo/remotes",
+			wantRemoteToml: "/tmp/repo/remotes/my-remote/rice.toml",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotRemotesDir := RemotesDir(tc.repoRoot)
+			if gotRemotesDir != tc.wantRemotesDir {
+				t.Fatalf("RemotesDir(%q) = %q, want %q", tc.repoRoot, gotRemotesDir, tc.wantRemotesDir)
+			}
+
+			gotRemoteToml := RemoteTomlPath(tc.repoRoot, tc.remoteName)
+			if gotRemoteToml != tc.wantRemoteToml {
+				t.Fatalf("RemoteTomlPath(%q, %q) = %q, want %q", tc.repoRoot, tc.remoteName, gotRemoteToml, tc.wantRemoteToml)
+			}
+		})
+	}
+}
+
+func TestSentinels(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+	}{
+		{"ErrRepoNotInitialized", ErrRepoNotInitialized},
+		{"ErrRepoDirty", ErrRepoDirty},
+		{"ErrRemoteAlreadyExists", ErrRemoteAlreadyExists},
+		{"ErrRemoteNotFound", ErrRemoteNotFound},
+		{"ErrRemoteInUse", ErrRemoteInUse},
+		{"ErrSubmoduleNotInitialized", ErrSubmoduleNotInitialized},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.err == nil {
+				t.Fatalf("%s is nil", tc.name)
+			}
+			if !errors.Is(tc.err, tc.err) {
+				t.Fatalf("errors.Is(%s, %s) = false, want true", tc.name, tc.name)
+			}
+		})
+	}
+}
