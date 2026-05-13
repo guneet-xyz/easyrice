@@ -87,3 +87,22 @@ func TestLogLevelFlagOverridesEnv(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 }
+
+func TestRootCmd_InvalidLogLevelHidesUsage(t *testing.T) {
+	resetRootCmd()
+	buf := &bytes.Buffer{}
+	cmd := rootCmd
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--log-level=invalid", "version"})
+	t.Cleanup(func() {
+		cmd.SetArgs(nil)
+	})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+
+	output := buf.String()
+	assert.NotContains(t, output, "Usage:")
+	assert.Contains(t, output, "invalid log level")
+}
