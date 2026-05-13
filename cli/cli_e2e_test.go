@@ -183,6 +183,9 @@ func TestE2E_InstallWithDeps(t *testing.T) {
 
 func TestE2E_InstallWithDeps_Linux(t *testing.T) {
 	requireLinuxDeps(t)
+	if os.Geteuid() != 0 {
+		t.Skip("requires root: exercises apt-get install path which is gated by deps.Install root check")
+	}
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
