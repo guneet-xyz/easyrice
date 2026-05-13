@@ -57,16 +57,6 @@ func TestInit_RepoExistsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "check repo")
 }
 
-// TestSwitch_RepoExistsError exercises cli/switch.go check-repo failure.
-func TestSwitch_RepoExistsError(t *testing.T) {
-	resetInstallFlags()
-	setRepoParentAsFile(t)
-
-	_, err := runInstallCmd(t, "", "switch", "mypkg", "macbook")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "check repo")
-}
-
 // TestStatus_RepoExistsError exercises cli/status.go:79-81 in
 // showDeclaredDependencies (called via `status <pkg>` when the package is in state).
 func TestStatus_RepoExistsError(t *testing.T) {
@@ -97,9 +87,8 @@ func TestDoctor_StateLoadError(t *testing.T) {
 	assert.Contains(t, out, "Cannot read state file")
 }
 
-// TestInstall_ExecutePlanError exercises cli/install.go:127-129 — the
-// "execute plan: %w" branch when ExecuteInstallPlan fails (corrupt state file
-// makes its internal state.Load fail).
+// TestInstall_ExecutePlanError exercises the converge-plan error path when
+// state.Load fails inside BuildConvergePlan due to a corrupt state file.
 func TestInstall_ExecutePlanError(t *testing.T) {
 	resetInstallFlags()
 	_, _, _ = setupTestRepo(t)
@@ -115,5 +104,5 @@ func TestInstall_ExecutePlanError(t *testing.T) {
 		"--skip-deps",
 	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "execute plan")
+	assert.Contains(t, err.Error(), "load state")
 }

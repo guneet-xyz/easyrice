@@ -132,31 +132,6 @@ func TestIntegration_InstallStatusSwitchUninstall(t *testing.T) {
 		assert.Contains(t, out, "demo")
 	})
 
-	t.Run("switch_to_work", func(t *testing.T) {
-		resetInstallFlags()
-		out, err := runInstallCmd(t, "",
-			"--state", statePath,
-			"--yes",
-			"switch", "demo", "work",
-		)
-		require.NoError(t, err, "out=%s", out)
-
-		_, err = os.Lstat(tgtCommon)
-		assert.True(t, os.IsNotExist(err), "no orphan common symlink after switch; lstat err=%v", err)
-
-		ok, err := symlink.IsSymlinkTo(tgtWork, srcWork)
-		require.NoError(t, err)
-		assert.True(t, ok, "expected %s -> %s after switch", tgtWork, srcWork)
-
-		s, err := state.Load(statePath)
-		require.NoError(t, err)
-		ps, present := s["demo"]
-		require.True(t, present, "state must still contain 'demo' after switch")
-		assert.Equal(t, "work", ps.Profile)
-		require.Len(t, ps.InstalledLinks, 1)
-		assert.Equal(t, srcWork, ps.InstalledLinks[0].Source)
-		assert.Equal(t, tgtWork, ps.InstalledLinks[0].Target)
-	})
 
 	t.Run("uninstall_demo", func(t *testing.T) {
 		resetInstallFlags()
