@@ -354,3 +354,183 @@ func TestStatus_PrintsBrokenLinkLine(t *testing.T) {
 	assert.Contains(t, out, "[BROKEN]")
 	assert.Contains(t, out, " broken link: "+target)
 }
+
+func TestStatus_SummaryLine_AllStates(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	// Create symlinks for OK and BROKEN packages
+	okSource := filepath.Join(tmp, "ok-src")
+	okTarget := filepath.Join(tmp, "ok-tgt")
+	require.NoError(t, os.WriteFile(okSource, []byte("x"), 0o644))
+	require.NoError(t, os.Symlink(okSource, okTarget))
+
+	brokenSource := filepath.Join(tmp, "broken-src")
+	brokenTarget := filepath.Join(tmp, "broken-tgt")
+	otherSource := filepath.Join(tmp, "other-src")
+	require.NoError(t, os.WriteFile(brokenSource, []byte("x"), 0o644))
+	require.NoError(t, os.WriteFile(otherSource, []byte("y"), 0o644))
+	require.NoError(t, os.Symlink(otherSource, brokenTarget))
+
+	writeStatusState(t, statePath, state.State{
+		"okpkg": state.PackageState{
+			Profile:        "common",
+			InstalledLinks: []state.InstalledLink{{Source: okSource, Target: okTarget}},
+			InstalledAt:    time.Now(),
+		},
+		"brokenpkg": state.PackageState{
+			Profile:        "common",
+			InstalledLinks: []state.InstalledLink{{Source: brokenSource, Target: brokenTarget}},
+			InstalledAt:    time.Now(),
+		},
+		"untrackedpkg": state.PackageState{
+			Profile:        "custom",
+			InstalledLinks: []state.InstalledLink{{Source: okSource, Target: okTarget}},
+			InstalledAt:    time.Now(),
+		},
+	})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.okpkg]
+description = "OK package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.okpkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.brokenpkg]
+description = "Broken package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.brokenpkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.notinstalledpkg1]
+description = "Not installed 1"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.notinstalledpkg1.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.notinstalledpkg2]
+description = "Not installed 2"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.notinstalledpkg2.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Total: 5 packages — 3 installed, 2 not installed, 1 broken, 1 untracked.")
+}
+
+func TestStatus_SummaryLine_NoUntracked(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	okSource := filepath.Join(tmp, "ok-src")
+	okTarget := filepath.Join(tmp, "ok-tgt")
+	require.NoError(t, os.WriteFile(okSource, []byte("x"), 0o644))
+	require.NoError(t, os.Symlink(okSource, okTarget))
+
+	brokenSource := filepath.Join(tmp, "broken-src")
+	brokenTarget := filepath.Join(tmp, "broken-tgt")
+	otherSource := filepath.Join(tmp, "other-src")
+	require.NoError(t, os.WriteFile(brokenSource, []byte("x"), 0o644))
+	require.NoError(t, os.WriteFile(otherSource, []byte("y"), 0o644))
+	require.NoError(t, os.Symlink(otherSource, brokenTarget))
+
+	writeStatusState(t, statePath, state.State{
+		"okpkg": state.PackageState{
+			Profile:        "common",
+			InstalledLinks: []state.InstalledLink{{Source: okSource, Target: okTarget}},
+			InstalledAt:    time.Now(),
+		},
+		"brokenpkg": state.PackageState{
+			Profile:        "common",
+			InstalledLinks: []state.InstalledLink{{Source: brokenSource, Target: brokenTarget}},
+			InstalledAt:    time.Now(),
+		},
+	})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.okpkg]
+description = "OK package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.okpkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.brokenpkg]
+description = "Broken package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.brokenpkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.notinstalledpkg]
+description = "Not installed"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.notinstalledpkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Total: 3 packages — 2 installed, 1 not installed, 1 broken.")
+	assert.NotContains(t, out, "untracked")
+}
+
+func TestStatus_SummaryLine_FilterSuppresses(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath, st := installedPkgState(t, tmp, "mypkg")
+	writeStatusState(t, statePath, st)
+
+	repoRoot := writeRepoManifest(t, statusManifestMypkg)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status", "mypkg",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.NotContains(t, out, "Total:")
+}
+
+func TestStatus_SummaryLine_PlainMode(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath, st := installedPkgState(t, tmp, "mypkg")
+	writeStatusState(t, statePath, st)
+
+	repoRoot := writeRepoManifest(t, statusManifestMypkg)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--plain",
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Total: 1 packages -- 1 installed, 0 not installed, 0 broken.")
+	assert.NotContains(t, out, "—")
+}

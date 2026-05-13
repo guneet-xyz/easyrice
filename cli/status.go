@@ -14,6 +14,7 @@ import (
 	"github.com/guneet-xyz/easyrice/internal/prompt"
 	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/state"
+	"github.com/guneet-xyz/easyrice/internal/style"
 	"github.com/guneet-xyz/easyrice/internal/symlink"
 )
 
@@ -85,6 +86,19 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		} else {
 			for _, name := range pkgNames {
 				renderPackageLine(out, name, mf, st)
+			}
+			if filter == "" && len(pkgNames) > 0 {
+				installed, notInstalled, broken, untracked := summarizePackages(pkgNames, mf, st)
+				sep := "—"
+				if style.Plain() {
+					sep = "--"
+				}
+				untrackedStr := ""
+				if untracked > 0 {
+					untrackedStr = fmt.Sprintf(", %d untracked", untracked)
+				}
+				fmt.Fprintf(out, "\nTotal: %d packages %s %d installed, %d not installed, %d broken%s.\n",
+					len(pkgNames), sep, installed, notInstalled, broken, untrackedStr)
 			}
 		}
 	}
@@ -176,6 +190,29 @@ func brokenLinks(pkgState state.PackageState) []state.InstalledLink {
 		}
 	}
 	return broken
+}
+
+func summarizePackages(names []string, mf *manifest.Manifest, st state.State) (installed, notInstalled, broken, untracked int) {
+	for _, name := range names {
+		pkgState, isInstalled := st[name]
+		declared := false
+		if mf != nil {
+			_, declared = mf.Packages[name]
+		}
+		switch {
+		case !isInstalled:
+			notInstalled++
+		case isInstalled && !declared:
+			untracked++
+			installed++ // untracked IS installed
+		default:
+			if len(brokenLinks(pkgState)) > 0 {
+				broken++
+			}
+			installed++
+		}
+	}
+	return
 }
 
 func renderRemotes(ctx context.Context, w io.Writer, repoRoot string) {
