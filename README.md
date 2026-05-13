@@ -93,15 +93,17 @@ easyrice install nvim --profile work
 
 ## Commands
 
-| Command     | Purpose                                                  |
-|-------------|----------------------------------------------------------|
-| `init`      | Clone a dotfile repo into the fixed managed location     |
-| `update`    | `git pull` the managed repo                              |
-| `install`   | Install a package under a profile                        |
-| `uninstall` | Remove all links recorded in state                       |
-| `switch`    | Uninstall current profile, install a new one             |
-| `status`    | Show installed packages, profiles, drift                 |
-| `doctor`    | Detect broken links and missing sources                  |
+| Command | Purpose |
+|---|---|
+| `init` | Clone a dotfile repo into the fixed managed location |
+| `update` | `git pull` the managed repo |
+| `install` | Converge one package, or every package when omitted |
+| `uninstall` | Remove all links recorded in state for a package |
+| `status` | Show repo state, installed packages, drift, dependencies, and remotes |
+| `doctor` | Run health checks |
+| `remote` | Manage remote rices as git submodules |
+| `upgrade` | Upgrade the easyrice binary |
+| `version` | Print the current version |
 
 Examples:
 
@@ -109,7 +111,7 @@ Examples:
 rice init https://github.com/you/dotfiles.git
 rice install nvim --profile macbook
 rice uninstall nvim -y
-rice switch zsh --profile work --log-level info
+rice install zsh --profile work --log-level info
 rice update
 rice status
 rice doctor
@@ -117,12 +119,14 @@ rice doctor
 
 ## Persistent flags
 
-| Flag           | Default                          | Purpose                                          |
-|----------------|----------------------------------|--------------------------------------------------|
-| `--profile`    | (required for `install`)         | Which profile to install or switch to            |
-| `--state`      | `~/.config/easyrice/state.json`  | Path to state.json (Windows: `%APPDATA%/easyrice/`) |
-| `--log-level`  | `warn`                           | `debug` / `info` / `warn` / `error` / `critical` |
-| `--yes`, `-y`  | `false`                          | Skip interactive confirmation prompts            |
+| Flag | Default | Purpose |
+|---|---|---|
+| `--state` | `~/.config/easyrice/state.json` | Path to state.json (Windows: `%APPDATA%/easyrice/`) |
+| `--log-level` | `warn` | `debug` / `info` / `warn` / `error` / `critical` |
+| `--yes`, `-y` | `false` | Skip interactive confirmation prompts |
+| `--no-update-check` | `false` | Skip update reminder checks |
+
+`install` also accepts `--profile <name>` and `--skip-deps`. If `--profile` is omitted, easyrice uses the package's stored profile, then a hostname-matching profile, then `default`, then the sole profile if only one is declared.
 
 There is no `--repo` flag. The repo path is fixed at `~/.config/easyrice/repos/default/` and managed by `rice init` / `rice update`.
 
@@ -131,6 +135,7 @@ There is no `--repo` flag. The repo path is fixed at `~/.config/easyrice/repos/d
 | Variable              | Effect                                                    |
 |-----------------------|-----------------------------------------------------------|
 | `EASYRICE_LOG_LEVEL`  | Sets the default log level (`--log-level` flag wins).     |
+| `EASYRICE_NO_UPDATE_CHECK=1` | Skips update reminder checks.                    |
 
 ## State file
 
@@ -190,7 +195,7 @@ Source modes:
 - `file`: walk the source dir and symlink each file individually under `target`. Multiple sources overlay (last wins).
 - `folder`: symlink the entire source dir as one unit. Not overlayable.
 
-For the full schema, profile composition rules, and OS gating, see [`AGENTS.md`](./AGENTS.md).
+For the full manifest schema, see [`docs/rice-toml.md`](./docs/rice-toml.md). For command workflows, see [`docs/usage.md`](./docs/usage.md).
 
 ## Development
 
