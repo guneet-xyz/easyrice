@@ -92,51 +92,6 @@ func RenderPlan(w io.Writer, p *plan.Plan) {
 	}
 }
 
-// RenderSwitchPlan writes the combined switch plan (uninstall + install phases).
-func RenderSwitchPlan(w io.Writer, uninstall *plan.Plan, install *plan.Plan) {
-	if uninstall == nil || install == nil {
-		return
-	}
-
-	// Uninstall phase
-	fmt.Fprintf(w, "Plan: uninstall %s\n", uninstall.PackageName)
-	if len(uninstall.Ops) > 0 {
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		for _, op := range uninstall.Ops {
-			label := "REMOVE"
-			if op.IsDir {
-				label = "REMOVE-DIR"
-			}
-			fmt.Fprintf(tw, "  %s\t%s\n", label, op.Target)
-		}
-		tw.Flush()
-	}
-
-	// Install phase
-	fmt.Fprintf(w, "Plan: install %s (profile: %s)\n", install.PackageName, install.Profile)
-	if len(install.Ops) > 0 {
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		for _, op := range install.Ops {
-			label := "CREATE"
-			if op.IsDir {
-				label = "CREATE-DIR"
-			}
-			fmt.Fprintf(tw, "  %s\t%s\t→\t%s\n", label, op.Target, op.Source)
-		}
-		tw.Flush()
-	}
-
-	// Combined total
-	totalOps := len(uninstall.Ops) + len(install.Ops)
-	fmt.Fprintf(w, "Total: %d symlinks (%d remove, %d create).\n", totalOps, len(uninstall.Ops), len(install.Ops))
-
-	// Conflicts from install phase (if any)
-	if len(install.Conflicts) > 0 {
-		fmt.Fprintf(w, "\nConflicts (%d):\n", len(install.Conflicts))
-		RenderConflicts(w, install.Conflicts)
-	}
-}
-
 // RenderConflicts writes conflict lines to w.
 //
 //	CONFLICT  <target>: <reason>
