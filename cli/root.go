@@ -8,6 +8,7 @@ import (
 
 	"github.com/guneet-xyz/easyrice/internal/logger"
 	"github.com/guneet-xyz/easyrice/internal/state"
+	"github.com/guneet-xyz/easyrice/internal/style"
 	"github.com/guneet-xyz/easyrice/internal/updater"
 	"github.com/spf13/cobra"
 )
@@ -20,14 +21,16 @@ var (
 	flagLogLevel      string
 	flagYes           bool
 	flagNoUpdateCheck bool
+	flagPlain         bool
 )
 
 var updateCheckDisabled bool
 
 var rootCmd = &cobra.Command{
-	Use:   "easyrice",
-	Short: "Cross-platform dotfile manager",
-	Long:  `easyrice installs dotfile packages from your managed rice repo using symlinks.`,
+	Use:            "easyrice",
+	Short:          "Cross-platform dotfile manager",
+	Long:           `easyrice installs dotfile packages from your managed rice repo using symlinks.`,
+	SilenceUsage:   true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		levelStr := flagLogLevel
 		if levelStr == "" {
@@ -51,6 +54,7 @@ var rootCmd = &cobra.Command{
 		}
 		// Set updateCheckDisabled from flag or env var (strict: only "1")
 		updateCheckDisabled = flagNoUpdateCheck || os.Getenv("EASYRICE_NO_UPDATE_CHECK") == "1"
+		style.SetPlain(flagPlain)
 		return nil
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
@@ -69,6 +73,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagLogLevel, "log-level", "", "log level: debug, info, warn, error, or critical (default: warn; env: EASYRICE_LOG_LEVEL)")
 	rootCmd.PersistentFlags().BoolVarP(&flagYes, "yes", "y", false, "bypass confirmation prompts")
 	rootCmd.PersistentFlags().BoolVar(&flagNoUpdateCheck, "no-update-check", false, "skip the update reminder (env: EASYRICE_NO_UPDATE_CHECK=1)")
+	rootCmd.PersistentFlags().BoolVar(&flagPlain, "plain", false, "ASCII-only output (no glyphs); useful for scripts and CI")
 }
 
 // UpdateCheckDisabled returns true if update checks should be skipped.
