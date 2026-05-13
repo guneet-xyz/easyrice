@@ -10,11 +10,13 @@ cli/
 ├── root.go               # rootCmd + persistent flags + PersistentPreRunE (logger.Init)
 ├── init.go               # easyrice init <git-url>  (clone repo into managed location)
 ├── update.go             # easyrice update          (git pull on managed repo)
-├── install.go            # easyrice install <pkg> --profile <name>
+├── remote.go             # easyrice remote {add,remove,update,list}  (manage submodules under remotes/)
+├── install.go            # easyrice install [pkg] [--profile <name>]  (converge: install/switch/repair/no-op)
 ├── uninstall.go          # easyrice uninstall <pkg>
-├── switch.go             # easyrice switch <pkg> --profile <name>
 ├── status.go             # easyrice status [pkg]
 ├── doctor.go             # easyrice doctor
+├── upgrade.go            # easyrice upgrade         (self-update binary; see upgrade section below)
+├── reminder.go           # shared post-command update reminder helper
 ├── version.go            # easyrice version  (uses const Version in root.go)
 └── *_test.go             # one per command file
 ```
@@ -28,6 +30,8 @@ cli/
 | Change persistent pre-run (logger setup) | `cli/root.go` `PersistentPreRunE` |
 | Change clone behavior | `cli/init.go` (delegates to `internal/repo.Clone`) |
 | Change pull behavior | `cli/update.go` (delegates to `internal/repo.Pull`) |
+| Change `rice remote ...` behavior | `cli/remote.go` (delegates to `internal/repo` `SubmoduleAdd/Remove/Update/List`) |
+| Change converge (install) semantics | `cli/install.go` (delegates to `internal/installer.BuildConvergePlan` / `ConvergeAll`) |
 | Bump CLI version string | `cli/root.go` `const Version` |
 
 ## CONVENTIONS
@@ -36,9 +40,11 @@ cli/
 - Commands MUST delegate work to `internal/installer` or `internal/repo` (or other internal pkgs). NO business logic in `cli/`.
 - Read persistent flag values via the package-level vars in `root.go` (`flagState`, `flagYes`). There is NO `flagRepo` - the repo path is fixed via `repo.DefaultRepoPath()`.
 - For interactive y/n: call `prompt.Confirm()`; respect `flagYes` to bypass.
-- Render plans via `prompt.RenderPlan` / `RenderSwitchPlan` / `RenderConflicts` BEFORE executing.
+- Render plans via `prompt.RenderPlan` / `RenderConflicts` BEFORE executing.
 - Errors from `runX` propagate to cobra → exit 1 via `Execute()` in `root.go`.
-- `install`/`uninstall`/`switch`/`status` MUST check `repo.Exists(repo.DefaultRepoPath())` and return `repo.ErrRepoNotInitialized` if missing.
+- `install`/`uninstall`/`status`/`remote` MUST check `repo.Exists(repo.DefaultRepoPath())` and return `repo.ErrRepoNotInitialized` if missing.
+- `remote add`/`remote remove` MUST also check `repo.IsClean(ctx, repoRoot)` and return `repo.ErrRepoDirty` if uncommitted changes exist. `install`/`status`/`doctor` only WARN on dirty trees, never block.
+- `install`/`uninstall` MUST NOT auto-commit. Only `remote add`/`remote remove` commit on the user's behalf, via `repo.CommitPaths(ctx, repoRoot, paths, msg)` (scope only).
 
 ## ANTI-PATTERNS
 
@@ -48,6 +54,27 @@ cli/
 - DO NOT add commands without a `_test.go` file alongside.
 - DO NOT reintroduce a `--repo` flag - the managed-repo path is fixed.
 - DO NOT call `exec.Command("git", ...)` - all git ops go through `internal/repo`.
+- DO NOT reintroduce a `switch` command - it was deleted by design. `install <pkg> --profile <name>` already handles install, profile change, repair, and no-op.
+- DO NOT auto-commit from `install` / `uninstall` / `update`. Only `remote add` / `remote remove` commit, and they MUST scope `git add` to specific paths via `repo.CommitPaths`. NEVER `git add -A` / `git add .`.
+
+## install (converge)
+
+`easyrice install [package] [--profile <name>]` is converge-shaped:
+
+- Zero args: converge every package declared in `rice.toml` (`installer.ConvergeAll`).
+- One arg: converge that package (`installer.BuildConvergePlan` → `ExecuteConvergePlan`).
+- For each package the outcome is one of: **installed** (not yet present), **profile-switched** (profile changed), **repaired** (links drifted), **no-op** (already correct).
+- The deleted `rice switch` command is fully covered by `install <pkg> --profile <name>` - DO NOT reintroduce it.
+
+## remote
+
+`easyrice remote {add,remove,update,list}` manages git submodules under `remotes/<name>/` in the managed repo, used by profile-level `import = "remotes/<name>#<pkg>.<profile>"` references.
+
+- `remote add <url> --name <name>` adds a submodule + auto-commits `.gitmodules` and `remotes/<name>` via `repo.CommitPaths`. Refuses if the working tree is dirty (`ErrRepoDirty`) or the name is taken (`ErrRemoteAlreadyExists`).
+- `remote remove <name>` deinit/removes the submodule and auto-commits the result. Refuses if any profile in `rice.toml` still imports from this remote (`ErrRemoteInUse`).
+- `remote update [name]` runs `git submodule update --remote` for the named remote (or all when omitted).
+- `remote list` prints submodule name, path, SHA, and state.
+- `--name` is validated against `^[a-zA-Z0-9_-]+$`.
 
 ## upgrade
 

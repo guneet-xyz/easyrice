@@ -18,17 +18,17 @@ Module: `github.com/guneet-xyz/easyrice` | Go 1.26.2 | Deps: cobra, BurntSushi/t
 easyrice/
 ├── cli/             # cobra commands, package main (see cli/AGENTS.md)
 ├── internal/
-│   ├── repo/        # managed repo lifecycle: DefaultRepoPath, Clone, Pull, Exists (see internal/repo/AGENTS.md)
-│   ├── manifest/    # single-file rice.toml parsing/validation/OS gating (see internal/manifest/AGENTS.md)
-│   ├── profile/     # ResolveSpecs(): profile name → []SourceSpec
+│   ├── repo/        # managed repo + remotes (submodules): Clone, Pull, IsClean, SubmoduleAdd/Remove/Update/List, CommitPaths (see internal/repo/AGENTS.md)
+│   ├── manifest/    # single-file rice.toml parsing/validation/OS gating + import spec (see internal/manifest/AGENTS.md)
+│   ├── profile/     # ResolveSpecs(): profile name → []SourceSpec (handles `import` from remotes)
 │   ├── plan/        # pure data types: Op, Conflict, Plan
-│   ├── installer/   # plan→execute for install/uninstall/switch (see internal/installer/AGENTS.md)
+│   ├── installer/   # plan→execute for install/uninstall + Converge/ConvergeAll (see internal/installer/AGENTS.md)
 │   ├── symlink/     # low-level FS ops (see internal/symlink/AGENTS.md)
 │   ├── state/       # state.json read/write
 │   ├── logger/      # zap tee: console + file (debug always to file)
 │   ├── doctor/      # health checks (legacy state detection)
 │   ├── updater/     # self-update: GitHub release polling + binary swap (see internal/updater/AGENTS.md)
-│   └── prompt/      # RenderPlan, RenderSwitchPlan, RenderConflicts, Confirm
+│   └── prompt/      # RenderPlan, RenderConflicts, Confirm
 ├── testdata/        # fixtures (testdata/manifest_valid_v2, testdata/manifest_invalid_v2, testdata/install_v2)
 ├── Makefile         # build / install / test / vet / fmt / clean
 ├── go.mod
@@ -43,13 +43,15 @@ easyrice/
 | Change persistent flags | `cli/root.go` |
 | Change `rice init` clone behavior | `cli/init.go` + `internal/repo/repo.go` (`Clone`) |
 | Change `rice update` pull behavior | `cli/update.go` + `internal/repo/repo.go` (`Pull`) |
+| Change `rice remote ...` behavior | `cli/remote.go` + `internal/repo/git_ops.go` (`SubmoduleAdd/Remove/Update/List`) |
 | Change managed repo location | `internal/repo/repo.go` (`DefaultRepoPath`) |
 | Change rice.toml schema | `internal/manifest/schema.go` + `internal/manifest/validate.go` |
+| Change profile import syntax | `internal/manifest/import_spec.go` (`ParseImportSpec`) |
 | Change manifest loading | `internal/manifest/load.go` (`LoadFile`) |
 | Change install/overlay/folder-mode logic | `internal/installer/install.go` (BuildInstallPlan) |
+| Change converge (install-as-converge) semantics | `internal/installer/converge.go` (BuildConvergePlan, ConvergeAll) |
 | Change conflict semantics | `internal/installer/conflict.go` (DetectConflicts) |
 | Change uninstall behavior | `internal/installer/uninstall.go` |
-| Change switch atomicity | `internal/installer/switch.go` |
 | Change state.json shape | `internal/state/state.go` (`InstalledLink`, `PackageState`, `State`) |
 | Change log levels / output | `internal/logger/logger.go` |
 | Add health check | `internal/doctor/` |
@@ -65,17 +67,22 @@ easyrice/
 | `manifest.Validate`, `manifest.CheckOS` | func | `internal/manifest/{validate,osgating}.go` | Schema + OS gate |
 | `repo.DefaultRepoPath`, `repo.RepoTomlPath` | func | `internal/repo/repo.go` | Fixed managed-repo paths |
 | `repo.Exists`, `repo.Clone`, `repo.Pull`, `repo.GitOnPath` | func | `internal/repo/repo.go` | Lifecycle ops on the managed repo |
-| `repo.ErrRepoNotInitialized`, `repo.ErrPackageNotDeclared` | var/func | `internal/repo/errors.go` | Sentinel errors for CLI mapping |
-| `profile.ResolveSpecs` | func | `internal/profile/profile.go` | profile name → ordered `[]SourceSpec` |
+| `repo.IsGitRepo`, `repo.IsClean`, `repo.HasUncommittedChanges`, `repo.CurrentBranch`, `repo.CommitPaths` | func | `internal/repo/git_ops.go` | Git state queries + scoped commits (NEVER `git add -A`) |
+| `repo.SubmoduleAdd`, `repo.SubmoduleRemove`, `repo.SubmoduleUpdate`, `repo.SubmoduleList` | func | `internal/repo/git_ops.go` | Manage `remotes/<name>` submodules backing `rice remote` |
+| `repo.Submodule`, `repo.SubmoduleState` | type | `internal/repo/git_ops.go` | Result types for `SubmoduleList` |
+| `repo.ErrRepoNotInitialized`, `repo.ErrPackageNotDeclared`, `repo.ErrRepoDirty`, `repo.ErrRemoteAlreadyExists`, `repo.ErrRemoteNotFound`, `repo.ErrRemoteInUse`, `repo.ErrSubmoduleNotInitialized` | var/func | `internal/repo/errors.go` | Sentinel errors for CLI mapping |
+| `manifest.ImportSpec`, `manifest.ParseImportSpec` | type/func | `internal/manifest/import_spec.go` | Parse `remotes/<name>#<pkg>.<profile>` |
+| `profile.ResolveSpecs` | func | `internal/profile/profile.go` | profile name → ordered `[]SourceSpec` (resolves `import` recursively, cycle-detected) |
 | `plan.Op`, `plan.Plan`, `plan.Conflict` | struct | `internal/plan/plan.go` | Dry-run model (data only) |
-| `installer.Install` / `Uninstall` / `Switch` | func | `internal/installer/` | High-level orchestration |
+| `installer.Install` / `Uninstall` | func | `internal/installer/` | High-level orchestration |
 | `installer.BuildInstallPlan` / `ExecuteInstallPlan` | func | `internal/installer/install.go` | Plan/execute split |
+| `installer.ConvergeRequest`, `installer.ConvergeResult`, `installer.BuildConvergePlan`, `installer.ExecuteConvergePlan`, `installer.ConvergeAll` | type/func | `internal/installer/converge.go` | Idempotent install-as-converge: install/profile-switch/repair/no-op in one path |
 | `installer.DetectConflicts` | func | `internal/installer/conflict.go` | Idempotent conflict check |
 | `symlink.{Create,Remove,IsSymlinkTo,ReadLink}` | func | `internal/symlink/symlink.go` | FS primitives |
 | `state.{Load,Save,DefaultPath}` | func | `internal/state/state.go` | state.json I/O |
 | `state.State` (= `map[string]PackageState`) | type | `internal/state/state.go` | Source of truth for uninstall |
 | `logger.{Init,L,Sync,ParseLevel,Debug,Info,Warn,Error,Critical}` | func/var | `internal/logger/logger.go` | Global zap logger `L` |
-| `prompt.{RenderPlan,RenderSwitchPlan,RenderConflicts,Confirm}` | func | `internal/prompt/prompt.go` | TTY rendering + y/n |
+| `prompt.{RenderPlan,RenderConflicts,Confirm}` | func | `internal/prompt/prompt.go` | TTY rendering + y/n |
 | `doctor.CheckLegacyState` | func | `internal/doctor/legacy_state.go` | Drift detection |
 | `updater.Updater`, `updater.New` | struct/func | `internal/updater/updater.go` | Self-update boundary; constructor validates `Owner`/`Repo` and sets defaults |
 | `updater.Options`, `updater.Release`, `updater.CheckResult` | struct | `internal/updater/types.go` | Configuration and result types for the updater |
@@ -127,6 +134,7 @@ sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
 | `packages.<name>.supported_os` | []string | yes | Package-level OS gate. Values: `linux`, `darwin`, `windows`. |
 | `packages.<name>.root` | string | no | Subdirectory holding the package files. Defaults to the package name. |
 | `packages.<name>.profiles.<name>.sources` | []table | yes | Inline table form ONLY. Each: `path`, `mode`, `target` (all required). |
+| `packages.<name>.profiles.<name>.import` | string | no | Optional. Imports a profile from a remote rice. Format: `remotes/<name>#<pkg>.<profile>`. Imported sources are resolved first, local `sources` (if any) overlay AFTER under file-mode last-wins rules. Cycle-detected and recursive. |
 
 `SourceSpec.UnmarshalTOML` rejects non-table forms - DO NOT accept bare strings.
 
@@ -161,8 +169,14 @@ sources = [
 
 - `rice init <url>` clones the dotfile repo to that path. Errors if the directory already exists.
 - `rice update` runs `git -C <path> pull`.
-- All other commands (`install`, `uninstall`, `switch`, `status`) read `rice.toml` from that path. If the path doesn't exist, they return `repo.ErrRepoNotInitialized`.
-- `git` MUST be on `PATH` for `init` and `update`. Check via `repo.GitOnPath()`.
+- `rice remote add <url> --name <name>` adds a git submodule at `remotes/<name>` and auto-commits `.gitmodules` + `remotes/<name>` (refuses if the working tree is dirty).
+- `rice remote remove <name>` deinit/removes the submodule and auto-commits the result. Refuses if any profile in `rice.toml` still imports from this remote (`ErrRemoteInUse`).
+- `rice remote update [name]` runs `git submodule update --remote` for the named remote (or all when omitted).
+- `rice remote list` prints submodule name, path, SHA, and state.
+- All other commands (`install`, `uninstall`, `status`) read `rice.toml` from that path. If the path doesn't exist, they return `repo.ErrRepoNotInitialized`.
+- Dirty working tree: BLOCKS `remote add/remove` (`ErrRepoDirty`); WARNS only on `install`/`status`/`doctor`.
+- Auto-commit policy: ONLY `remote add/remove` commit on the user's behalf. `install`/`uninstall` NEVER commit. `git add` is always scoped to specific paths via `repo.CommitPaths` - NEVER `git add -A` or `git add .`.
+- `git` MUST be on `PATH` for `init`, `update`, and any `remote` subcommand. Check via `repo.GitOnPath()`.
 
 ## State File
 
@@ -185,7 +199,7 @@ Override with `--state /path`. Format: JSON object keyed by package name (`map[s
 }
 ```
 
-State is the source of truth for `uninstall` and `switch`. Symlinks are absolute, pointing back into the managed repo.
+State is the source of truth for `uninstall`. Symlinks are absolute, pointing back into the managed repo.
 
 ## CLI Surface
 
@@ -204,13 +218,18 @@ Env: `EASYRICE_LOG_LEVEL` sets log level. Flag wins over env.
 ```sh
 easyrice init      <git-url>
 easyrice update
-easyrice install   <package> --profile <name>
+easyrice remote    add <url> --name <name>
+easyrice remote    remove <name>
+easyrice remote    update [name]
+easyrice remote    list
+easyrice install   [package] [--profile <name>]
 easyrice uninstall <package>
-easyrice switch    <package> --profile <name>
 easyrice status    [package]
 easyrice doctor
 easyrice version
 ```
+
+`install` is **converge-shaped**: with no args it converges every declared package; with one arg it converges that package. For each package the outcome is one of: install (not yet present), profile-switch (profile changed), repair (links drifted), or no-op (already correct). The deleted `switch` command is fully subsumed by `install <pkg> --profile <name>`.
 
 ## COMMANDS
 
@@ -250,6 +269,9 @@ make fmt
 - Calling the GitHub API or `go-selfupdate` outside `internal/updater/` - the updater package owns ALL network I/O for releases.
 - Reading or writing `update-check.json` / `upgrade.lock` outside `internal/updater/` - go through the exported API.
 - Auto-restarting the binary after `upgrade` succeeds - we print a restart hint and exit; the user re-runs.
+- Reintroducing the `rice switch` command - it was deleted by design. `install <pkg> --profile <name>` covers every transition (install, profile change, repair, no-op).
+- Auto-committing during `install`/`uninstall` - install never commits. Only `rice remote add/remove` commit on behalf of the user.
+- Using `git add -A` or `git add .` anywhere - always scope commits to specific paths via `repo.CommitPaths(ctx, repoRoot, paths, msg)`.
 
 ## TESTING
 
