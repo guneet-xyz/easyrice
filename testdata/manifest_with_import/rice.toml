@@ -1,0 +1,9 @@
+schema_version = 1
+
+[packages.nvim]
+description = "Neovim configuration (local with import)"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.nvim.profiles.default]
+import = "remotes/kick#nvim.default"
+sources = [{path = "local", mode = "file", target = "$HOME/.config/nvim"}]

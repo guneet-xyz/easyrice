@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.nvim]
+description = "Neovim configuration (remote)"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
