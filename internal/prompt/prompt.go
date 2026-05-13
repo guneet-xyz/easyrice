@@ -247,7 +247,7 @@ func RenderDepReport(w io.Writer, report deps.DepReport) {
 				glyph = "FAIL"
 			case "!":
 				glyph = "WARN"
-			// "?" stays "?"
+				// "?" stays "?"
 			}
 		}
 

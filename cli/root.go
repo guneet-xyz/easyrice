@@ -27,10 +27,10 @@ var (
 var updateCheckDisabled bool
 
 var rootCmd = &cobra.Command{
-	Use:            "easyrice",
-	Short:          "Cross-platform dotfile manager",
-	Long:           `easyrice installs dotfile packages from your managed rice repo using symlinks.`,
-	SilenceUsage:   true,
+	Use:          "easyrice",
+	Short:        "Cross-platform dotfile manager",
+	Long:         `easyrice installs dotfile packages from your managed rice repo using symlinks.`,
+	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		levelStr := flagLogLevel
 		if levelStr == "" {
