@@ -75,12 +75,10 @@ func TestVersionStdoutUnchanged(t *testing.T) {
 	Version = "v1.0.0"
 	reminderTTYFn = func() bool { return false }
 
-	stdout := captureStdout(t, func() {
-		_, err := runInstallCmd(t, "", "version")
-		require.NoError(t, err)
-	})
+	stdout, err := runInstallCmd(t, "", "version")
+	require.NoError(t, err)
 
-	expected := "easyrice version v1.0.0\n"
+	expected := "easyrice v1.0.0\n"
 	assert.Equal(t, expected, stdout, "version stdout must be exactly %q", expected)
 }
 
@@ -102,7 +100,7 @@ func TestVersionReminderOnTTYNewer(t *testing.T) {
 		require.NoError(t, err, "out=%s", out)
 	})
 
-	assert.Contains(t, stderr, "A new release of easyrice is available")
+	assert.Contains(t, stderr, "Update available")
 	assert.Contains(t, stderr, "v1.0.0")
 	assert.Contains(t, stderr, "v2.0.0")
 }

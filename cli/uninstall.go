@@ -36,12 +36,12 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	prompt.RenderPlan(cmd.OutOrStdout(), p)
 
 	if !flagYes {
-		ok, err := prompt.Confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Proceed?")
+		ok, err := prompt.Confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Apply this plan?")
 		if err != nil {
 			return err
 		}
 		if !ok {
-			fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. No changes were made.")
 			return nil
 		}
 	}
@@ -49,5 +49,6 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	if err := installer.ExecuteUninstallPlan(p, flagState); err != nil {
 		return fmt.Errorf("execute plan: %w", err)
 	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Uninstalled %s.\n", pkg)
 	return nil
 }

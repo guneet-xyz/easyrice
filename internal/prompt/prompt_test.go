@@ -22,8 +22,8 @@ func TestRenderPlan_EmptyInstall(t *testing.T) {
 	RenderPlan(&buf, p)
 	output := buf.String()
 
-	assert.Contains(t, output, "Plan: install test (profile: default)")
-	assert.Contains(t, output, "Total: 0 symlinks to create.")
+	assert.Contains(t, output, "Plan: install test using profile default")
+	assert.Contains(t, output, "Total: 0 link(s) to create.")
 }
 
 func TestRenderPlan_CreateOps(t *testing.T) {
@@ -40,13 +40,13 @@ func TestRenderPlan_CreateOps(t *testing.T) {
 	RenderPlan(&buf, p)
 	output := buf.String()
 
-	assert.Contains(t, output, "Plan: install test (profile: default)")
+	assert.Contains(t, output, "Plan: install test using profile default")
 	assert.Contains(t, output, "CREATE")
 	assert.Contains(t, output, "/home/user/.config/file1")
 	assert.Contains(t, output, "src/file1")
 	assert.Contains(t, output, "/home/user/.config/file2")
 	assert.Contains(t, output, "src/file2")
-	assert.Contains(t, output, "Total: 2 symlinks to create.")
+	assert.Contains(t, output, "Total: 2 link(s) to create.")
 }
 
 func TestRenderPlan_RemoveOps(t *testing.T) {
@@ -66,7 +66,7 @@ func TestRenderPlan_RemoveOps(t *testing.T) {
 	assert.Contains(t, output, "REMOVE")
 	assert.Contains(t, output, "/home/user/.config/file1")
 	assert.Contains(t, output, "/home/user/.config/file2")
-	assert.Contains(t, output, "Total: 2 symlinks to remove.")
+	assert.Contains(t, output, "Total: 2 link(s) to remove.")
 }
 
 func TestRenderPlan_ManyOps(t *testing.T) {
@@ -89,7 +89,7 @@ func TestRenderPlan_ManyOps(t *testing.T) {
 	RenderPlan(&buf, p)
 	output := buf.String()
 
-	assert.Contains(t, output, "Total: 100 symlinks to create.")
+	assert.Contains(t, output, "Total: 100 link(s) to create.")
 	count := strings.Count(output, "CREATE")
 	assert.Equal(t, 100, count)
 }
@@ -208,9 +208,9 @@ func TestRenderPlan_WithConflicts(t *testing.T) {
 	RenderPlan(&buf, p)
 	output := buf.String()
 
-	assert.Contains(t, output, "Plan: install test (profile: default)")
+	assert.Contains(t, output, "Plan: install test using profile default")
 	assert.Contains(t, output, "CREATE")
-	assert.Contains(t, output, "Total: 1 symlinks to create.")
+	assert.Contains(t, output, "Total: 1 link(s) to create.")
 	assert.Contains(t, output, "Conflicts (2):")
 	assert.Contains(t, output, "CONFLICT  /home/user/.config/conflict1: already exists")
 	assert.Contains(t, output, "CONFLICT  /home/user/.config/conflict2: is a directory")
@@ -253,14 +253,14 @@ func TestRenderPlan_MultipleOps(t *testing.T) {
 	RenderPlan(&buf, p)
 	output := buf.String()
 
-	assert.Contains(t, output, "Plan: install test (profile: default)")
+	assert.Contains(t, output, "Plan: install test using profile default")
 	assert.Contains(t, output, "src/file1")
 	assert.Contains(t, output, "src/file2")
 	assert.Contains(t, output, "src/file3")
 	assert.Contains(t, output, "/home/user/.config/file1")
 	assert.Contains(t, output, "/home/user/.config/file2")
 	assert.Contains(t, output, "/home/user/.config/file3")
-	assert.Contains(t, output, "Total: 3 symlinks to create.")
+	assert.Contains(t, output, "Total: 3 link(s) to create.")
 }
 
 func TestRenderConflicts_NoConflicts(t *testing.T) {
@@ -358,7 +358,7 @@ func TestSelect_ThreeInvalidInputsReturnsError(t *testing.T) {
 	idx, err := Select(in, &out, "Choose", options, 0)
 	assert.Error(t, err)
 	assert.Equal(t, 0, idx)
-	assert.Contains(t, err.Error(), "too many invalid inputs")
+	assert.Contains(t, err.Error(), "too many invalid choices")
 }
 
 func TestSelect_EOFReturnsError(t *testing.T) {
@@ -402,7 +402,7 @@ func TestSelectWithDefault_AutoAcceptTrue(t *testing.T) {
 	idx, err := SelectWithDefault(nil, &out, "Choose", options, 1, true)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, idx)
-	assert.Contains(t, out.String(), "Using: Option B")
+	assert.Contains(t, out.String(), "Using default: Option B")
 }
 
 func TestSelectWithDefault_AutoAcceptFalse(t *testing.T) {
@@ -456,7 +456,7 @@ func TestRenderDepReport_AllStatuses(t *testing.T) {
 	assert.Contains(t, output, "Dependency check:")
 	assert.Contains(t, output, "✓ ripgrep (14.1.0) — installed")
 	assert.Contains(t, output, "✗ neovim — missing")
-	assert.Contains(t, output, "! node (18.20.0) — version mismatch, need >=20")
+	assert.Contains(t, output, "! node (18.20.0) — version mismatch; required >=20")
 	assert.Contains(t, output, "? mdformat — installed (version unknown)")
 }
 
@@ -486,7 +486,7 @@ func TestSelectInstallMethod_AutoAcceptTrue(t *testing.T) {
 	method, err := SelectInstallMethod(in, &out, entry, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "apt", method.ID)
-	assert.Contains(t, out.String(), "Using: apt install ripgrep")
+	assert.Contains(t, out.String(), "Using default: apt install ripgrep")
 }
 
 func TestSelectInstallMethod_UserSelection(t *testing.T) {
@@ -504,7 +504,7 @@ func TestSelectInstallMethod_UserSelection(t *testing.T) {
 	method, err := SelectInstallMethod(in, &out, entry, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "brew", method.ID)
-	assert.Contains(t, out.String(), "Choose install method for ripgrep:")
+	assert.Contains(t, out.String(), "Choose how to install ripgrep:")
 }
 
 func TestSelectInstallMethod_CustomMethodConfirmYes(t *testing.T) {
@@ -521,7 +521,7 @@ func TestSelectInstallMethod_CustomMethodConfirmYes(t *testing.T) {
 	method, err := SelectInstallMethod(in, &out, entry, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "custom", method.ID)
-	assert.Contains(t, out.String(), "Run this command from your dotfile repo's rice.toml?")
+	assert.Contains(t, out.String(), "Run this command from rice.toml?")
 }
 
 func TestSelectInstallMethod_CustomMethodConfirmNo(t *testing.T) {
@@ -627,7 +627,7 @@ func TestSelectWithDefault_InvalidInputThenEOF(t *testing.T) {
 
 	idx, err := SelectWithDefault(in, &out, "Choose", options, 0, false)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "too many invalid inputs")
+	assert.Contains(t, err.Error(), "too many invalid choices")
 	assert.Equal(t, 0, idx)
 }
 
@@ -686,7 +686,7 @@ func TestRenderDepReport_VersionMismatchWithoutVersion(t *testing.T) {
 	output := buf.String()
 
 	assert.Contains(t, output, "Dependency check:")
-	assert.Contains(t, output, "! tool (1.0.0) — version mismatch, need ")
+	assert.Contains(t, output, "! tool (1.0.0) — version mismatch; required ")
 }
 
 func TestSelectInstallMethod_SelectWithDefaultError(t *testing.T) {
@@ -722,7 +722,7 @@ func TestSelectInstallMethod_MultipleMethodsWithCommand(t *testing.T) {
 	method, err := SelectInstallMethod(in, &out, entry, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "cargo", method.ID)
-	assert.Contains(t, out.String(), "Choose install method for ripgrep:")
+	assert.Contains(t, out.String(), "Choose how to install ripgrep:")
 	assert.Contains(t, out.String(), "1) apt install ripgrep")
 	assert.Contains(t, out.String(), "2) brew install ripgrep")
 	assert.Contains(t, out.String(), "3) cargo install ripgrep")
@@ -785,5 +785,5 @@ func TestRenderPlan_RemoveDirOps(t *testing.T) {
 
 	assert.Contains(t, output, "REMOVE-DIR")
 	assert.Contains(t, output, "/home/user/.config/dir")
-	assert.Contains(t, output, "Total: 1 symlinks to remove.")
+	assert.Contains(t, output, "Total: 1 link(s) to remove.")
 }

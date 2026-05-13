@@ -62,7 +62,7 @@ func withinHome(target, home string) bool {
 // BuildInstallPlan computes the plan WITHOUT touching the filesystem (other than reads).
 // On conflicts, returns the plan AND an error so callers can render details.
 func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
-	logger.Debug("BuildInstallPlan: start",
+	logger.Debug("building install plan",
 		zap.String("repoRoot", req.RepoRoot),
 		zap.String("package", req.PackageName),
 		zap.String("os", req.CurrentOS),
@@ -77,7 +77,7 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	for i, s := range specs {
 		sourcePaths[i] = s.Path
 	}
-	logger.Info("Building install plan",
+	logger.Info("building install plan",
 		zap.String("package", req.PackageName),
 		zap.Strings("sources", sourcePaths),
 	)
@@ -151,12 +151,12 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 			}
 			// Skip rice.toml files anywhere in tree
 			if d.Name() == "rice.toml" {
-				logger.Warn("Skipping rice.toml in source tree", zap.String("path", path))
+				logger.Warn("skipping rice.toml in source tree", zap.String("path", path))
 				return nil
 			}
 			// Skip symlinks (we only manage real files)
 			if d.Type()&fs.ModeSymlink != 0 {
-				logger.Warn("Skipping symlink in source tree", zap.String("path", path))
+				logger.Warn("skipping symlink in source tree", zap.String("path", path))
 				return nil
 			}
 
@@ -253,14 +253,14 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 		return p, fmt.Errorf("conflicts detected: %d", len(conflicts))
 	}
 
-	logger.Debug("BuildInstallPlan: done", zap.Int("ops", len(p.Ops)))
+	logger.Debug("install plan built", zap.Int("ops", len(p.Ops)))
 	return p, nil
 }
 
 // ExecuteInstallPlan applies the plan to the filesystem.
 // On partial failure, the partial state is saved and the error returned.
 func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) {
-	logger.Info("Installing package",
+	logger.Info("installing package",
 		zap.String("package", p.PackageName),
 		zap.String("profile", p.Profile),
 		zap.Int("ops", len(p.Ops)),
@@ -284,7 +284,7 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 			InstalledDependencies: existing.InstalledDependencies,
 		}
 		if saveErr := state.Save(statePath, st); saveErr != nil {
-			logger.Error("Failed to save partial state",
+			logger.Error("failed to save partial install state",
 				zap.String("path", statePath),
 				zap.Error(saveErr),
 			)
@@ -299,7 +299,7 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 		}
 		// Ensure parent directory of target exists
 		if err := os.MkdirAll(filepath.Dir(op.Target), 0o755); err != nil {
-			logger.Error("Failed to create parent directory",
+			logger.Error("failed to create parent directory",
 				zap.String("target", op.Target),
 				zap.Error(err),
 			)
@@ -313,7 +313,7 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 				created = append(created, state.InstalledLink{Source: op.Source, Target: op.Target, IsDir: op.IsDir})
 				continue
 			}
-			logger.Error("Failed to create symlink",
+			logger.Error("failed to create symlink",
 				zap.String("source", op.Source),
 				zap.String("target", op.Target),
 				zap.Error(err),
@@ -336,7 +336,7 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 		return &InstallResult{LinksCreated: created}, fmt.Errorf("failed to save state: %w", err)
 	}
 
-	logger.Info("Installed package",
+	logger.Info("installed package",
 		zap.String("package", p.PackageName),
 		zap.Int("symlinks", len(created)),
 	)

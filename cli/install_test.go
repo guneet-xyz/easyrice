@@ -151,7 +151,7 @@ func TestInstall_StdinNoAborts(t *testing.T) {
 		"--profile", "common",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Aborted.")
+	assert.Contains(t, out, "Cancelled. No changes were made.")
 
 	link := filepath.Join(homeDir, ".config", "mypkg", "base.toml")
 	_, err = os.Lstat(link)
@@ -192,8 +192,8 @@ sources = [{path = "common", mode = "file", target = "$HOME"}]
 		"--profile", "common",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Installed: pkg1")
-	assert.Contains(t, out, "Installed: pkg2")
+	assert.Contains(t, out, "Installed pkg1")
+	assert.Contains(t, out, "Installed pkg2")
 
 	for _, p := range []string{"pkg1", "pkg2"} {
 		_, err := os.Lstat(filepath.Join(homeDir, p+".conf"))
@@ -213,7 +213,7 @@ func TestInstall_ProfileSwitch(t *testing.T) {
 		"--profile", "common",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Installed: mypkg (profile: common)")
+	assert.Contains(t, out, "Installed mypkg using profile common.")
 
 	resetInstallFlags()
 	out, err = runInstallCmd(t, "",
@@ -223,7 +223,7 @@ func TestInstall_ProfileSwitch(t *testing.T) {
 		"--profile", "macbook",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Switched: mypkg from common to macbook")
+	assert.Contains(t, out, "Switched mypkg from profile common to macbook.")
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
@@ -251,8 +251,8 @@ func TestInstall_DirtyWarn(t *testing.T) {
 		"--profile", "common",
 	)
 	require.NoError(t, err, "install must proceed despite dirty repo; out=%s", out)
-	assert.Contains(t, out, "Warning: rice repo at "+repoRoot)
-	assert.Contains(t, out, "Installed: mypkg")
+	assert.Contains(t, out, "Warning: the rice repo has uncommitted changes at "+repoRoot)
+	assert.Contains(t, out, "Installed mypkg")
 }
 
 func TestInstall_NoCommit(t *testing.T) {
@@ -314,7 +314,7 @@ func TestInstall_WithProfileFlag(t *testing.T) {
 		"--profile", "macbook",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "profile: macbook")
+	assert.Contains(t, out, "profile macbook")
 
 	for _, rel := range []string{".config/mypkg/base.toml", ".config/mypkg/machine.toml"} {
 		_, err := os.Lstat(filepath.Join(homeDir, rel))
@@ -793,7 +793,7 @@ func TestInstall_SwitchingMessage(t *testing.T) {
 		"--profile", "macbook",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Switching mypkg: common → macbook")
+	assert.Contains(t, out, "Switching mypkg from profile common to macbook.")
 }
 
 func TestInstall_RepairMessage(t *testing.T) {
@@ -821,7 +821,7 @@ func TestInstall_RepairMessage(t *testing.T) {
 	)
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "Repairing mypkg")
-	assert.Contains(t, out, "broken links")
+	assert.Contains(t, out, "link changes")
 }
 
 func TestInstall_DirtyWarningIncludesPath(t *testing.T) {
@@ -845,6 +845,6 @@ func TestInstall_DirtyWarningIncludesPath(t *testing.T) {
 		"--profile", "common",
 	)
 	require.NoError(t, err, "install must proceed despite dirty repo; out=%s", out)
-	assert.Contains(t, out, "Warning: rice repo at "+repoRoot)
-	assert.Contains(t, out, "cd "+repoRoot+" && git status")
+	assert.Contains(t, out, "Warning: the rice repo has uncommitted changes at "+repoRoot)
+	assert.Contains(t, out, "Install will continue")
 }

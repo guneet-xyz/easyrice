@@ -53,9 +53,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	exists, existsErr := repo.Exists(repoRoot)
 	if existsErr != nil {
-		fmt.Fprintf(out, "Warning: check repo: %v\n", existsErr)
+		fmt.Fprintf(out, "Warning: could not check rice repo: %v\n", existsErr)
 	} else if !exists {
-		fmt.Fprintln(out, "Repo not initialized.")
+		fmt.Fprintln(out, "Rice repo is not initialized. Run `rice init <url>` first.")
 	}
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
@@ -71,7 +71,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if mfLoaded, mfErr := manifest.LoadFile(repo.RepoTomlPath(repoRoot)); mfErr == nil {
 			mf = mfLoaded
 		} else {
-			fmt.Fprintf(out, "Warning: load manifest: %v\n", mfErr)
+			fmt.Fprintf(out, "Warning: could not load rice.toml: %v\n", mfErr)
 		}
 	}
 
@@ -91,7 +91,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	if filter != "" {
 		if depErr := showDeclaredDependencies(cmd, filter); depErr != nil {
-			fmt.Fprintf(out, "Warning: dependency check failed: %v\n", depErr)
+			fmt.Fprintf(out, "Warning: could not check declared dependencies: %v\n", depErr)
 		}
 	}
 
@@ -110,15 +110,15 @@ func renderGitHeader(ctx context.Context, w io.Writer, repoRoot string) {
 	}
 	dirty, derr := repo.HasUncommittedChanges(ctx, repoRoot)
 	if derr != nil {
-		fmt.Fprintf(w, "Git: %s, unknown\n", branch)
+		fmt.Fprintf(w, "Git: branch %s, status unknown\n", branch)
 		return
 	}
 	if dirty {
-		fmt.Fprintf(w, "Git: %s, uncommitted change(s)\n", branch)
-		fmt.Fprintf(w, "Tip: commit your rice changes to preserve history (cd %s && git status).\n", repoRoot)
+		fmt.Fprintf(w, "Git: branch %s, uncommitted changes\n", branch)
+		fmt.Fprintf(w, "Tip: commit your rice repo changes to preserve history. Repo: %s\n", repoRoot)
 		return
 	}
-	fmt.Fprintf(w, "Git: %s, clean\n", branch)
+	fmt.Fprintf(w, "Git: branch %s, clean\n", branch)
 }
 
 func collectPackageNames(mf *manifest.Manifest, st state.State, filter string) []string {
@@ -159,7 +159,7 @@ func renderPackageLine(w io.Writer, name string, mf *manifest.Manifest, st state
 		if len(broken) > 0 {
 			fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusBroken, name, pkgState.Profile)
 			for _, link := range broken {
-				fmt.Fprintf(w, "    BROKEN %s -> %s\n", link.Target, link.Source)
+				fmt.Fprintf(w, "    broken link: %s -> %s\n", link.Target, link.Source)
 			}
 		} else {
 			fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusOK, name, pkgState.Profile)
@@ -181,7 +181,7 @@ func brokenLinks(pkgState state.PackageState) []state.InstalledLink {
 func renderRemotes(ctx context.Context, w io.Writer, repoRoot string) {
 	subs, err := repo.SubmoduleList(ctx, repoRoot)
 	if err != nil || len(subs) == 0 {
-		fmt.Fprintln(w, "Remotes: (none)")
+		fmt.Fprintln(w, "Remotes: none")
 		return
 	}
 	fmt.Fprintln(w, "Remotes:")
@@ -191,7 +191,7 @@ func renderRemotes(ctx context.Context, w io.Writer, repoRoot string) {
 		case repo.SubmoduleInitialized:
 			label = "OK"
 		case repo.SubmoduleNotInitialized:
-			label = "NOT INIT"
+			label = "NOT INITIALIZED"
 		case repo.SubmoduleModified:
 			label = "MODIFIED"
 		default:
@@ -243,7 +243,7 @@ func showDeclaredDependencies(cmd *cobra.Command, pkgName string) error {
 		return fmt.Errorf("check dependencies: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Declared dependencies:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "\nDeclared dependencies for %s:\n", pkgName)
 	prompt.RenderDepReport(cmd.OutOrStdout(), report)
 
 	return nil

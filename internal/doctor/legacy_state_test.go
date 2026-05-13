@@ -20,7 +20,7 @@ func TestCheckLegacyState(t *testing.T) {
 			name:         "legacy exists, new missing -> warns",
 			createLegacy: true,
 			createNew:    false,
-			wantContains: []string{"Legacy state found", "mv "},
+			wantContains: []string{"Legacy rice state found", "mv "},
 		},
 		{
 			name:         "legacy exists, new exists -> silent",

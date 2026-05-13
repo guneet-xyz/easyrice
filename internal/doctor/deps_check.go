@@ -41,7 +41,7 @@ func CheckDeclaredDeps(ctx context.Context, w io.Writer, runner deps.Runner, m m
 		// Run the dependency check
 		report, err := deps.Check(ctx, runner, pkg.Dependencies, m.CustomDependencies, deps.Detect())
 		if err != nil {
-			fmt.Fprintf(w, "[WARN] %s: dep check failed: %v\n", pkgName, err)
+			fmt.Fprintf(w, "[WARN] %s: dependency check failed: %v\n", pkgName, err)
 			warnings++
 			continue
 		}
@@ -51,15 +51,15 @@ func CheckDeclaredDeps(ctx context.Context, w io.Writer, runner deps.Runner, m m
 			depName := entry.Dep.Name
 			switch entry.Status {
 			case deps.DepMissing:
-				fmt.Fprintf(w, "[WARN] %s.%s — missing (installed=%v constraint=%s)\n",
+				fmt.Fprintf(w, "[WARN] %s.%s: missing (installed=%v, required=%s)\n",
 					pkgName, depName, entry.Installed, entry.Dep.Version)
 				warnings++
 			case deps.DepVersionMismatch:
-				fmt.Fprintf(w, "[WARN] %s.%s — version mismatch (installed=%s constraint=%s)\n",
+				fmt.Fprintf(w, "[WARN] %s.%s: version mismatch (installed=%s, required=%s)\n",
 					pkgName, depName, entry.InstalledVersion, entry.Dep.Version)
 				warnings++
 			case deps.DepProbeUnknownVersion:
-				fmt.Fprintf(w, "[INFO] %s.%s — installed (version unknown)\n",
+				fmt.Fprintf(w, "[INFO] %s.%s: installed, but version could not be detected\n",
 					pkgName, depName)
 			case deps.DepOK:
 				// No output for OK status

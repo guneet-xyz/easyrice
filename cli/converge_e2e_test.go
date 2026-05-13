@@ -40,7 +40,7 @@ sources = [{path = "default", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "default",
 	)
 	require.NoError(t, err, "first install: out=%s", out)
-	assert.Contains(t, out, "Installed: demo (profile: default)")
+	assert.Contains(t, out, "Installed demo using profile default.")
 
 	target := filepath.Join(homeDir, ".config", "demo", "file1")
 	expectedSrc := filepath.Join(repoRoot, "demo", "default", "file1")
@@ -55,7 +55,7 @@ sources = [{path = "default", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "default",
 	)
 	require.NoError(t, err, "second install: out=%s", out)
-	assert.Contains(t, out, "already converged")
+	assert.Contains(t, out, "is already up to date")
 
 	// Symlink and state must be unchanged.
 	assertSymlinkPointsTo(t, target, expectedSrc)
@@ -105,7 +105,7 @@ sources = [{path = "work", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "work",
 	)
 	require.NoError(t, err, "install work: out=%s", out)
-	assert.Contains(t, out, "Switched: demo from common to work")
+	assert.Contains(t, out, "Switched demo from profile common to work.")
 
 	assertNoSymlinkAt(t, common)
 	assertSymlinkPointsTo(t, work, filepath.Join(repoRoot, "demo", "work", "file-work"))
@@ -163,7 +163,7 @@ sources = [
 		"--profile", "workmac",
 	)
 	require.NoError(t, err, "install workmac: out=%s", out)
-	assert.Contains(t, out, "Switched: demo from common to workmac")
+	assert.Contains(t, out, "Switched demo from profile common to workmac.")
 
 	// shared.conf now points to the work copy (last-wins overlay).
 	assertSymlinkPointsTo(t, shared, filepath.Join(repoRoot, "demo", "work", "shared.conf"))
@@ -217,7 +217,7 @@ sources = [{path = "default", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "default",
 	)
 	require.NoError(t, err, "repair install: out=%s", out)
-	assert.Contains(t, out, "Repaired: demo")
+	assert.Contains(t, out, "Repaired demo")
 
 	assertSymlinkPointsTo(t, link1, src1)
 	assertSymlinkPointsTo(t, link2, src2)
@@ -302,7 +302,7 @@ sources = [{path = "missing", mode = "file", target = "$HOME"}]
 		"--profile", "common",
 	)
 	require.Error(t, err, "expected converge-all to fail because of pkgB; out=%s", out)
-	assert.Contains(t, out, "Installed: pkgA")
+	assert.Contains(t, out, "Installed pkgA")
 	assert.Contains(t, out, "pkgB")
 
 	// pkgA succeeded: symlink + state.
@@ -348,7 +348,7 @@ sources = [{path = "default", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "default",
 	)
 	require.NoError(t, err, "second install: out=%s", out)
-	assert.Contains(t, out, "already converged")
+	assert.Contains(t, out, "is already up to date")
 }
 
 // 8. Profile switch with --yes: no prompt, links transition cleanly.
@@ -393,7 +393,7 @@ sources = [{path = "work", mode = "file", target = "$HOME/.config/demo"}]
 		"--profile", "work",
 	)
 	require.NoError(t, err, "switch to work: out=%s", out)
-	assert.Contains(t, out, "Switched: demo from common to work")
+	assert.Contains(t, out, "Switched demo from profile common to work.")
 
 	assertNoSymlinkAt(t, commonLink)
 	assertSymlinkPointsTo(t, workLink, filepath.Join(repoRoot, "demo", "work", "work.conf"))

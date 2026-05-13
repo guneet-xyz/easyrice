@@ -32,24 +32,24 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	issues := 0
 
 	if err := doctor.CheckGitOnPath(); err != nil {
-		fmt.Fprintf(out, "[ERROR] %v\n", err)
+		fmt.Fprintf(out, "[ERROR] Git: %v\n", err)
 		issues++
 	} else {
-		fmt.Fprintln(out, "[OK] git available")
+		fmt.Fprintln(out, "[OK] Git is available.")
 	}
 
 	if err := doctor.CheckRepoInitialized(repo.DefaultRepoPath()); err != nil {
-		fmt.Fprintf(out, "[ERROR] %v\n", err)
+		fmt.Fprintf(out, "[ERROR] Repo: %v\n", err)
 		issues++
 	} else {
-		fmt.Fprintln(out, "[OK] repo initialized")
+		fmt.Fprintln(out, "[OK] Rice repo is initialized.")
 	}
 
 	doctor.CheckLegacyState(out)
 
 	st, err := state.Load(flagState)
 	if err != nil {
-		fmt.Fprintf(out, "[ERROR] Cannot read state file %s: %v\n", flagState, err)
+		fmt.Fprintf(out, "[ERROR] State: could not read %s: %v\n", flagState, err)
 		issues++
 		st = state.State{}
 	}
@@ -58,7 +58,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	mf, err := manifest.LoadFile(repo.RepoTomlPath(repoPath))
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			fmt.Fprintf(out, "[WARN] Cannot load manifest: %v\n", err)
+			fmt.Fprintf(out, "[WARN] Manifest: could not load rice.toml: %v\n", err)
 		}
 	} else {
 		ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
@@ -85,7 +85,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			if _, statErr := os.Lstat(link.Target); os.IsNotExist(statErr) {
 				fmt.Fprintf(out, "[ERROR] %s: missing symlink %s -> %s\n", pkgName, link.Target, link.Source)
 			} else {
-				fmt.Fprintf(out, "[ERROR] %s: symlink replaced %s (expected -> %s)\n", pkgName, link.Target, link.Source)
+				fmt.Fprintf(out, "[ERROR] %s: symlink was replaced at %s (expected -> %s)\n", pkgName, link.Target, link.Source)
 			}
 			issues++
 		}
@@ -96,6 +96,6 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		maybePrintUpdateReminder()
 		return nil
 	}
-	fmt.Fprintf(out, "\n%d issue(s) found.\n", issues)
-	return fmt.Errorf("%d issue(s) found", issues)
+	fmt.Fprintf(out, "\nFound %d issue(s).\n", issues)
+	return fmt.Errorf("doctor found %d issue(s)", issues)
 }

@@ -28,7 +28,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("check repo: %w", err)
 	}
 	if exists {
-		return fmt.Errorf("easyrice repo already initialized at %q; run `rice update` to pull, or remove the directory to re-init", dest)
+		return fmt.Errorf("easyrice repo is already initialized at %q; run `rice update` to pull changes, or remove that directory and run `rice init <url>` again", dest)
 	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return fmt.Errorf("create parent dir: %w", err)
@@ -36,6 +36,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := repo.Clone(cmd.Context(), args[0], dest); err != nil {
 		return fmt.Errorf("clone: %w", err)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Cloned to %s\nNext: rice install <package>\n", dest)
+	fmt.Fprintf(cmd.OutOrStdout(), "Cloned rice repo to %s\nNext: run `rice install <package>` or `rice install` to converge all packages.\n", dest)
 	return nil
 }

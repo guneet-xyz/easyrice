@@ -49,9 +49,8 @@ func RenderPlan(w io.Writer, p *plan.Plan) {
 		opType = "install" // default
 	}
 
-	// Header
 	if opType == "install" {
-		fmt.Fprintf(w, "Plan: install %s (profile: %s)\n", p.PackageName, p.Profile)
+		fmt.Fprintf(w, "Plan: install %s using profile %s\n", p.PackageName, p.Profile)
 	} else {
 		fmt.Fprintf(w, "Plan: uninstall %s\n", p.PackageName)
 	}
@@ -80,9 +79,9 @@ func RenderPlan(w io.Writer, p *plan.Plan) {
 	// Total line
 	count := len(p.Ops)
 	if opType == "install" {
-		fmt.Fprintf(w, "Total: %d symlinks to create.\n", count)
+		fmt.Fprintf(w, "Total: %d link(s) to create.\n", count)
 	} else {
-		fmt.Fprintf(w, "Total: %d symlinks to remove.\n", count)
+		fmt.Fprintf(w, "Total: %d link(s) to remove.\n", count)
 	}
 
 	// Conflicts (if any)
@@ -149,7 +148,7 @@ func SelectWithDefault(in io.Reader, out io.Writer, label string, options []Sele
 	if autoAccept {
 		// Print "Using: <label>" so user knows what's running
 		if defaultIdx >= 0 && defaultIdx < len(options) {
-			fmt.Fprintf(out, "Using: %s\n", options[defaultIdx].Label)
+			fmt.Fprintf(out, "Using default: %s\n", options[defaultIdx].Label)
 		}
 		return defaultIdx, nil
 	}
@@ -163,7 +162,7 @@ func SelectWithDefault(in io.Reader, out io.Writer, label string, options []Sele
 			fmt.Fprintf(out, "  %d) %s\n", i+1, opt.Label)
 		}
 	}
-	fmt.Fprintf(out, "Enter choice [default: %d]: ", defaultIdx+1)
+	fmt.Fprintf(out, "Choose an option [default: %d]: ", defaultIdx+1)
 
 	reader := bufio.NewReader(in)
 	const maxRetries = 3
@@ -184,10 +183,10 @@ func SelectWithDefault(in io.Reader, out io.Writer, label string, options []Sele
 			return n - 1, nil
 		}
 		if attempt < maxRetries-1 {
-			fmt.Fprintf(out, "Invalid choice %q. Enter 1-%d [default: %d]: ", line, len(options), defaultIdx+1)
+			fmt.Fprintf(out, "Invalid choice %q. Choose 1-%d [default: %d]: ", line, len(options), defaultIdx+1)
 		}
 	}
-	return 0, fmt.Errorf("prompt: too many invalid inputs")
+	return 0, fmt.Errorf("prompt: too many invalid choices")
 }
 
 // shorten truncates s to n characters, appending "..." if longer.
@@ -221,7 +220,7 @@ func RenderDepReport(w io.Writer, report deps.DepReport) {
 			status = "missing"
 		case deps.DepVersionMismatch:
 			glyph = "!"
-			status = fmt.Sprintf("version mismatch, need %s", entry.Dep.Version)
+			status = fmt.Sprintf("version mismatch; required %s", entry.Dep.Version)
 		case deps.DepProbeUnknownVersion:
 			glyph = "?"
 			status = "installed (version unknown)"
@@ -262,7 +261,7 @@ func SelectInstallMethod(in io.Reader, out io.Writer, entry deps.DepReportEntry,
 	}
 
 	// Select method
-	idx, err := SelectWithDefault(in, out, fmt.Sprintf("Choose install method for %s:", entry.Dep.Name), options, 0, autoAccept)
+	idx, err := SelectWithDefault(in, out, fmt.Sprintf("Choose how to install %s:", entry.Dep.Name), options, 0, autoAccept)
 	if err != nil {
 		return deps.InstallMethod{}, err
 	}
@@ -271,7 +270,7 @@ func SelectInstallMethod(in io.Reader, out io.Writer, entry deps.DepReportEntry,
 
 	// For custom methods, prompt for confirmation
 	if selected.ShellPayload != "" {
-		ok, err := Confirm(in, out, fmt.Sprintf("Run this command from your dotfile repo's rice.toml? %s", selected.ShellPayload))
+		ok, err := Confirm(in, out, fmt.Sprintf("Run this command from rice.toml? %s", selected.ShellPayload))
 		if err != nil {
 			return deps.InstallMethod{}, err
 		}

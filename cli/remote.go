@@ -16,7 +16,7 @@ import (
 
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
-	Short: "Manage remote rices (git submodules)",
+	Short: "Manage remote rice repos (git submodules)",
 }
 
 var remoteAddNameFlag string
@@ -25,28 +25,28 @@ var remoteNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var remoteAddCmd = &cobra.Command{
 	Use:   "add <url>",
-	Short: "Add a remote rice as a git submodule",
+	Short: "Add a remote rice repo as a git submodule",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runRemoteAdd,
 }
 
 var remoteRemoveCmd = &cobra.Command{
 	Use:   "remove <name>",
-	Short: "Remove a remote rice",
+	Short: "Remove a remote rice repo",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runRemoteRemove,
 }
 
 var remoteUpdateCmd = &cobra.Command{
 	Use:   "update [name]",
-	Short: "Update a remote rice (or all remote rices)",
+	Short: "Update one remote rice repo, or all of them",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runRemoteUpdate,
 }
 
 var remoteListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List configured remote rices",
+	Short: "List configured remote rice repos",
 	Args:  cobra.NoArgs,
 	RunE:  runRemoteList,
 }
@@ -57,16 +57,16 @@ func init() {
 	remoteCmd.AddCommand(remoteRemoveCmd)
 	remoteCmd.AddCommand(remoteUpdateCmd)
 	remoteCmd.AddCommand(remoteListCmd)
-	remoteAddCmd.Flags().StringVar(&remoteAddNameFlag, "name", "", "Name for the remote rice (required)")
+	remoteAddCmd.Flags().StringVar(&remoteAddNameFlag, "name", "", "name for the remote rice repo (required)")
 	_ = remoteAddCmd.MarkFlagRequired("name")
 }
 
 func validateRemoteName(name string) error {
 	if name == "" {
-		return fmt.Errorf("--name must not be empty")
+		return fmt.Errorf("--name is required")
 	}
 	if !remoteNameRe.MatchString(name) {
-		return fmt.Errorf("--name %q is invalid: must match %s", name, remoteNameRe.String())
+		return fmt.Errorf("--name %q is invalid; use only letters, numbers, underscores, and hyphens", name)
 	}
 	return nil
 }
@@ -124,19 +124,19 @@ func runRemoteAdd(cmd *cobra.Command, args []string) error {
 	tomlPath := repo.RemoteTomlPath(repoRoot, name)
 	if _, err := os.Stat(tomlPath); err != nil {
 		_ = repo.SubmoduleRemove(cmd.Context(), repoRoot, relPath)
-		return fmt.Errorf("remote rice has no rice.toml at %s", name)
+		return fmt.Errorf("remote %q does not contain a rice.toml", name)
 	}
 
 	if _, err := manifest.LoadFile(tomlPath); err != nil {
 		_ = repo.SubmoduleRemove(cmd.Context(), repoRoot, relPath)
-		return fmt.Errorf("remote rice manifest invalid: %w", err)
+		return fmt.Errorf("remote %q has an invalid rice.toml: %w", name, err)
 	}
 
 	if err := repo.CommitPaths(cmd.Context(), repoRoot, []string{".gitmodules", relPath}, fmt.Sprintf("Add remote rice %s", name)); err != nil {
 		return fmt.Errorf("commit submodule: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Added remote rice %q -> %s\nNext: edit rice.toml to import a profile from this remote.\n", name, url)
+	fmt.Fprintf(cmd.OutOrStdout(), "Added remote %q from %s.\nNext: edit rice.toml and import profiles with remotes/%s#<package>.<profile>.\n", name, url, name)
 	return nil
 }
 
@@ -195,7 +195,7 @@ func runRemoteRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("commit removal: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Removed remote rice %q\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "Removed remote %q.\n", name)
 	return nil
 }
 
@@ -220,14 +220,14 @@ func runRemoteUpdate(cmd *cobra.Command, args []string) error {
 		if err := repo.SubmoduleUpdate(cmd.Context(), repoRoot, "remotes/"+name); err != nil {
 			return fmt.Errorf("update submodule: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Updated remote rice %q\n", name)
+		fmt.Fprintf(cmd.OutOrStdout(), "Updated remote %q.\n", name)
 		return nil
 	}
 
 	if err := repo.SubmoduleUpdate(cmd.Context(), repoRoot, ""); err != nil {
 		return fmt.Errorf("update submodules: %w", err)
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "Updated all remote rices")
+	fmt.Fprintln(cmd.OutOrStdout(), "Updated all remotes.")
 	return nil
 }
 
@@ -242,7 +242,7 @@ func runRemoteList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("list submodules: %w", err)
 	}
 	if len(subs) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No remote rices configured.")
+		fmt.Fprintln(cmd.OutOrStdout(), "No remotes configured.")
 		return nil
 	}
 

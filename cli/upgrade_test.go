@@ -51,7 +51,7 @@ func TestUpgradeCheckPrintsAvailable(t *testing.T) {
 
 	out, err := runInstallCmd(t, "", "upgrade", "--check")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "new version available")
+	assert.Contains(t, out, "Update available")
 	assert.Contains(t, out, "v1.0.0")
 	assert.Contains(t, out, "v2.0.0")
 }
@@ -109,7 +109,7 @@ func TestUpgradeConfirmDeclined(t *testing.T) {
 	out, err := runInstallCmd(t, "n\n", "upgrade")
 	require.NoError(t, err, "out=%s", out)
 	assert.False(t, applied, "Apply must NOT be called when user declines")
-	assert.Contains(t, out, "cancelled")
+	assert.Contains(t, out, "Cancelled")
 }
 
 func TestUpgradeFetchErrorWrapped(t *testing.T) {

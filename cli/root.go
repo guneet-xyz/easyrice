@@ -27,7 +27,7 @@ var updateCheckDisabled bool
 var rootCmd = &cobra.Command{
 	Use:   "easyrice",
 	Short: "Cross-platform dotfile manager",
-	Long:  `rice installs dotfile packages from a rice repo onto your machine using symlinks.`,
+	Long:  `easyrice installs dotfile packages from your managed rice repo using symlinks.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		levelStr := flagLogLevel
 		if levelStr == "" {
@@ -46,7 +46,7 @@ var rootCmd = &cobra.Command{
 		// Cleanup orphan artifacts (best-effort, never block command execution)
 		if exe, err := os.Executable(); err == nil {
 			if cleanupErr := updater.CleanupOrphanArtifacts(exe); cleanupErr != nil {
-				logger.L.Debug("orphan cleanup failed", zap.Error(cleanupErr))
+				logger.L.Debug("could not clean up leftover upgrade files", zap.Error(cleanupErr))
 			}
 		}
 		// Set updateCheckDisabled from flag or env var (strict: only "1")
@@ -65,10 +65,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&flagState, "state", state.DefaultPath(), "path to state file")
-	rootCmd.PersistentFlags().StringVar(&flagLogLevel, "log-level", "", "log level: debug|info|warn|error|critical (default: warn, env: EASYRICE_LOG_LEVEL)")
+	rootCmd.PersistentFlags().StringVar(&flagState, "state", state.DefaultPath(), "path to the state file")
+	rootCmd.PersistentFlags().StringVar(&flagLogLevel, "log-level", "", "log level: debug, info, warn, error, or critical (default: warn; env: EASYRICE_LOG_LEVEL)")
 	rootCmd.PersistentFlags().BoolVarP(&flagYes, "yes", "y", false, "bypass confirmation prompts")
-	rootCmd.PersistentFlags().BoolVar(&flagNoUpdateCheck, "no-update-check", false, "skip update reminder (env: EASYRICE_NO_UPDATE_CHECK=1)")
+	rootCmd.PersistentFlags().BoolVar(&flagNoUpdateCheck, "no-update-check", false, "skip the update reminder (env: EASYRICE_NO_UPDATE_CHECK=1)")
 }
 
 // UpdateCheckDisabled returns true if update checks should be skipped.

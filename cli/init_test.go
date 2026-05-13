@@ -73,7 +73,7 @@ func TestInit_ClonesRepo(t *testing.T) {
 
 	out, err := runRootCmd(t, "init", bareURL)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Cloned to")
+	assert.Contains(t, out, "Cloned rice repo to")
 
 	dest := repo.DefaultRepoPath()
 	_, err = os.Stat(filepath.Join(dest, "rice.toml"))
@@ -139,7 +139,7 @@ func TestInit_SuccessWithFakeGit(t *testing.T) {
 
 	out, err := runRootCmd(t, "init", "https://example.invalid/repo.git")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Cloned to")
+	assert.Contains(t, out, "Cloned rice repo to")
 
 	dest := repo.DefaultRepoPath()
 	_, err = os.Stat(dest)

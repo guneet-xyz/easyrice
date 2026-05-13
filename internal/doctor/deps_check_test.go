@@ -90,7 +90,7 @@ func TestCheckDeclaredDeps(t *testing.T) {
 				},
 			},
 			wantWarnings: 1,
-			wantContains: []string{"[WARN] pkg1.custom_missing — missing"},
+			wantContains: []string{"[WARN] pkg1.custom_missing: missing"},
 		},
 		{
 			name: "package with version mismatch -> [WARN] line, warnings=1",
@@ -121,7 +121,7 @@ func TestCheckDeclaredDeps(t *testing.T) {
 				},
 			},
 			wantWarnings: 1,
-			wantContains: []string{"[WARN] pkg1.custom_mismatch — version mismatch"},
+			wantContains: []string{"[WARN] pkg1.custom_mismatch: version mismatch"},
 		},
 		{
 			name: "package with unknown version -> [INFO] line, warnings=0",
@@ -151,7 +151,7 @@ func TestCheckDeclaredDeps(t *testing.T) {
 				},
 			},
 			wantWarnings: 0,
-			wantContains: []string{"[INFO] pkg1.custom_unknown — installed (version unknown)"},
+			wantContains: []string{"[INFO] pkg1.custom_unknown: installed, but version could not be detected"},
 		},
 		{
 			name: "multiple packages sorted by name -> output in alphabetical order",

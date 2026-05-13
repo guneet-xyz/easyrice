@@ -22,7 +22,7 @@ type UninstallRequest struct {
 // Loads state, finds package's InstalledLinks, builds plan with OpRemove ops.
 // Returns error if package not in state.
 func BuildUninstallPlan(req UninstallRequest) (*plan.Plan, error) {
-	logger.Debug("BuildUninstallPlan: start",
+	logger.Debug("building uninstall plan",
 		zap.String("package", req.PackageName),
 	)
 
@@ -56,7 +56,7 @@ func BuildUninstallPlan(req UninstallRequest) (*plan.Plan, error) {
 		Conflicts:   []plan.Conflict{},
 	}
 
-	logger.Debug("BuildUninstallPlan: complete",
+	logger.Debug("uninstall plan built",
 		zap.String("package", req.PackageName),
 		zap.Int("ops", len(ops)),
 	)
@@ -69,7 +69,7 @@ func BuildUninstallPlan(req UninstallRequest) (*plan.Plan, error) {
 // If link is missing or replaced: log WARN and continue (don't error).
 // After processing: remove package entry from state and save.
 func ExecuteUninstallPlan(p *plan.Plan, statePath string) error {
-	logger.Info("Uninstalling package",
+	logger.Info("uninstalling package",
 		zap.String("package", p.PackageName),
 	)
 

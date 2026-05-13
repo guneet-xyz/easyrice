@@ -10,10 +10,10 @@ import (
 // FormatReminder returns a formatted reminder message for a new release.
 // It returns a 2-line string with no leading or trailing newlines:
 //
-//	A new release of easyrice is available: <current> → <latest>
-//	https://github.com/<owner>/<repo>/releases/latest
+//	Update available: <current> → <latest>
+//	Run `rice upgrade` or visit https://github.com/<owner>/<repo>/releases/latest
 func FormatReminder(current, latest, owner, repo string) string {
-	return fmt.Sprintf("A new release of easyrice is available: %s → %s\nhttps://github.com/%s/%s/releases/latest", current, latest, owner, repo)
+	return fmt.Sprintf("Update available: %s → %s\nRun `rice upgrade` or visit https://github.com/%s/%s/releases/latest", current, latest, owner, repo)
 }
 
 // ShouldShowReminder determines whether the update reminder should be displayed.

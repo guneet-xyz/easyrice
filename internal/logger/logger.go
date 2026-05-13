@@ -41,7 +41,7 @@ func ParseLevel(s string) (Level, error) {
 	case "critical":
 		return CriticalLevel, nil
 	default:
-		return 0, fmt.Errorf("invalid log level %q; valid values: debug, info, warn, error, critical", s)
+		return 0, fmt.Errorf("invalid log level %q; choose one of: debug, info, warn, error, critical", s)
 	}
 }
 
@@ -53,13 +53,13 @@ func Init(consoleLevel Level, logFilePath string) error {
 	// Create parent directory if needed
 	logDir := filepath.Dir(logFilePath)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory: %w", err)
+		return fmt.Errorf("create log directory: %w", err)
 	}
 
 	// Open log file
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open log file: %w", err)
+		return fmt.Errorf("open log file: %w", err)
 	}
 
 	// Console encoder: human-readable with colors

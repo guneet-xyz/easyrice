@@ -9,7 +9,7 @@ import (
 // telling the user to run `rice init`.
 func CheckRepoInitialized(repoPath string) error {
 	if _, err := os.Stat(repoPath); err != nil {
-		return fmt.Errorf("rice repo not found at %q — run `rice init <url>` to initialize", repoPath)
+		return fmt.Errorf("rice repo not found at %q; run `rice init <url>` to initialize it", repoPath)
 	}
 	return nil
 }

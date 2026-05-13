@@ -29,8 +29,8 @@ func CheckLegacyState(w io.Writer) {
 		return
 	}
 
-	fmt.Fprintf(w, "Warning: Legacy state found at %s.\n", legacyPath)
-	fmt.Fprintf(w, "Run: mv %s %s\n", legacyPath, newPath)
+	fmt.Fprintf(w, "[WARN] Legacy rice state found at %s.\n", legacyPath)
+	fmt.Fprintf(w, "       To reuse it, run: mv %s %s\n", legacyPath, newPath)
 }
 
 func fileExists(path string) bool {

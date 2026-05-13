@@ -44,7 +44,7 @@ func TestUpdate_PullsNewCommit(t *testing.T) {
 
 	out, err = runRootCmd(t, "update")
 	require.NoError(t, err, "update out=%s", out)
-	assert.Contains(t, out, "Pulled latest")
+	assert.Contains(t, out, "Updated rice repo from origin.")
 
 	_, err = os.Stat(filepath.Join(dest, "newfile.txt"))
 	require.NoError(t, err, "newfile.txt should be present after pull")
@@ -96,5 +96,5 @@ func TestUpdate_SuccessWithFakeGit(t *testing.T) {
 
 	out, err := runRootCmd(t, "update")
 	require.NoError(t, err, "update should succeed with fake git: %s", out)
-	assert.Contains(t, out, "Pulled latest from origin")
+	assert.Contains(t, out, "Updated rice repo from origin.")
 }

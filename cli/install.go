@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/installer"
@@ -83,15 +84,15 @@ func resolveDefaultProfile(pkg *manifest.PackageDef, pkgName, flag string, st st
 func formatOutcome(cr installer.ConvergeResult) string {
 	switch cr.Outcome {
 	case installer.OutcomeInstalled:
-		return fmt.Sprintf("Installed: %s (profile: %s)", cr.PackageName, cr.NewProfile)
+		return fmt.Sprintf("Installed %s using profile %s.", cr.PackageName, cr.NewProfile)
 	case installer.OutcomeProfileSwitched:
-		return fmt.Sprintf("Switched: %s from %s to %s", cr.PackageName, cr.OldProfile, cr.NewProfile)
+		return fmt.Sprintf("Switched %s from profile %s to %s.", cr.PackageName, cr.OldProfile, cr.NewProfile)
 	case installer.OutcomeRepaired:
-		return fmt.Sprintf("Repaired: %s (%d links)", cr.PackageName, len(cr.LinksAfter))
+		return fmt.Sprintf("Repaired %s (%d links now tracked).", cr.PackageName, len(cr.LinksAfter))
 	case installer.OutcomeNoOp:
-		return fmt.Sprintf("No-op: %s already converged", cr.PackageName)
+		return fmt.Sprintf("%s is already up to date.", cr.PackageName)
 	default:
-		return fmt.Sprintf("Unknown outcome for %s", cr.PackageName)
+		return fmt.Sprintf("Finished %s with an unknown outcome.", cr.PackageName)
 	}
 }
 
@@ -101,7 +102,7 @@ func emitDirtyWarning(cmd *cobra.Command, repoRoot string) {
 		return
 	}
 	if dirty {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: rice repo at %s has uncommitted changes; commit to preserve history (cd %s && git status).\n", repoRoot, repoRoot)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: the rice repo has uncommitted changes at %s. Install will continue, but commit your repo changes to preserve history.\n", repoRoot)
 	}
 }
 
@@ -148,16 +149,7 @@ func runInstallAll(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 		return results[i].PackageName < results[j].PackageName
 	})
 	for _, r := range results {
-		switch r.Outcome {
-		case installer.OutcomeInstalled:
-			fmt.Fprintf(out, "Installed: %s (profile: %s)\n", r.PackageName, r.NewProfile)
-		case installer.OutcomeProfileSwitched:
-			fmt.Fprintf(out, "Switched: %s from %s to %s\n", r.PackageName, r.OldProfile, r.NewProfile)
-		case installer.OutcomeRepaired:
-			fmt.Fprintf(out, "Repaired: %s (%d links)\n", r.PackageName, len(r.Plan.Ops))
-		case installer.OutcomeNoOp:
-			fmt.Fprintf(out, "No-op: %s already converged\n", r.PackageName)
-		}
+		fmt.Fprintln(out, formatOutcome(r))
 	}
 	if cerr != nil {
 		return fmt.Errorf("converge-all: %w", cerr)
@@ -176,7 +168,7 @@ func runInstallOne(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 	}
 
 	if flagSkipDeps {
-		logger.L.Warn("skipping dependency check")
+		logger.L.Warn("dependency check skipped", zap.String("package", pkgName))
 	}
 
 	var st state.State
@@ -209,7 +201,7 @@ func runInstallOne(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 		chosen = resolveDefaultProfile(&pkgDef, pkgName, flagProfile, st)
 	}
 	if chosen == "" {
-		return fmt.Errorf("package %q: cannot resolve profile (use --profile)", pkgName)
+		return fmt.Errorf("package %q: could not choose a profile automatically; pass --profile <name>", pkgName)
 	}
 
 	req := installer.ConvergeRequest{
@@ -241,23 +233,23 @@ func runInstallOne(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 
 	switch cr.Outcome {
 	case installer.OutcomeProfileSwitched:
-		fmt.Fprintf(out, "Switching %s: %s → %s\n", pkgName, cr.OldProfile, cr.NewProfile)
+		fmt.Fprintf(out, "Switching %s from profile %s to %s.\n", pkgName, cr.OldProfile, cr.NewProfile)
 	case installer.OutcomeRepaired:
-		fmt.Fprintf(out, "Repairing %s (%d broken links)\n", pkgName, len(cr.Plan.Ops))
+		fmt.Fprintf(out, "Repairing %s (%d link changes).\n", pkgName, len(cr.Plan.Ops))
 	case installer.OutcomeNoOp:
-		fmt.Fprintf(out, "%s already converged\n", pkgName)
+		fmt.Fprintf(out, "%s is already up to date.\n", pkgName)
 		return nil
 	case installer.OutcomeInstalled:
-		fmt.Fprintf(out, "Installing %s (profile: %s)\n", pkgName, cr.NewProfile)
+		fmt.Fprintf(out, "Installing %s using profile %s.\n", pkgName, cr.NewProfile)
 	}
 
 	if cr.Outcome != installer.OutcomeNoOp && !flagYes {
-		ok, err := prompt.Confirm(cmd.InOrStdin(), out, "Proceed?")
+		ok, err := prompt.Confirm(cmd.InOrStdin(), out, "Apply this plan?")
 		if err != nil {
 			return err
 		}
 		if !ok {
-			fmt.Fprintln(out, "Aborted.")
+			fmt.Fprintln(out, "Cancelled. No changes were made.")
 			return nil
 		}
 	}

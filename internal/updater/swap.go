@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/guneet-xyz/easyrice/internal/logger"
+	"go.uber.org/zap"
 )
 
 // Apply downloads the asset for release and atomically replaces the running
@@ -45,7 +46,7 @@ func (u *Updater) Apply(ctx context.Context, release *Release) error {
 
 	realExe, err := filepath.EvalSymlinks(exe)
 	if err != nil {
-		logger.L.Debug(fmt.Sprintf("updater: EvalSymlinks failed for %q, falling back: %v", exe, err))
+		logger.L.Debug("updater could not resolve executable symlink; using original path", zap.String("path", exe), zap.Error(err))
 		realExe = exe
 	}
 

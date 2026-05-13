@@ -23,7 +23,7 @@ var upgradeCmd = &cobra.Command{
 var flagUpgradeCheck bool
 
 func init() {
-	upgradeCmd.Flags().BoolVar(&flagUpgradeCheck, "check", false, "check for a new release without installing it")
+	upgradeCmd.Flags().BoolVar(&flagUpgradeCheck, "check", false, "check for a new release without installing")
 	rootCmd.AddCommand(upgradeCmd)
 }
 
@@ -47,7 +47,7 @@ var upgradeApplyFn = func(ctx context.Context, u *updater.Updater, rel *updater.
 
 func runUpgrade(cmd *cobra.Command, args []string) error {
 	if updater.IsDevBuild(Version) {
-		fmt.Fprintln(os.Stderr, "easyrice is a dev build; cannot self-upgrade. Reinstall via `go install github.com/guneet-xyz/easyrice/cli@latest` or download a release from https://github.com/guneet-xyz/easyrice/releases")
+		fmt.Fprintln(os.Stderr, "easyrice is a dev build, so self-upgrade is unavailable. Install a release from https://github.com/guneet-xyz/easyrice/releases or run `go install github.com/guneet-xyz/easyrice/cli@latest`.")
 		return fmt.Errorf("upgrade: %w", updater.ErrDevBuild)
 	}
 
@@ -57,7 +57,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	u, release, err := upgradeFetchFn(ctx)
 	if err != nil {
 		if errors.Is(err, updater.ErrAlreadyLatest) {
-			fmt.Fprintf(cmd.OutOrStdout(), "easyrice is up to date (%s)\n", Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "easyrice is already up to date (%s).\n", Version)
 			return nil
 		}
 		return fmt.Errorf("could not check for updates: %w", err)
@@ -65,12 +65,12 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 
 	newer, nerr := updater.IsNewer(Version, release.Version)
 	if nerr != nil || !newer {
-		fmt.Fprintf(cmd.OutOrStdout(), "easyrice is up to date (%s)\n", Version)
+		fmt.Fprintf(cmd.OutOrStdout(), "easyrice is already up to date (%s).\n", Version)
 		return nil
 	}
 
 	if flagUpgradeCheck {
-		fmt.Fprintf(cmd.OutOrStdout(), "new version available: %s → %s\nhttps://github.com/guneet-xyz/easyrice/releases/latest\n", Version, release.Version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Update available: %s → %s\nRelease: https://github.com/guneet-xyz/easyrice/releases/latest\n", Version, release.Version)
 		return nil
 	}
 
@@ -80,7 +80,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if !ok {
-			fmt.Fprintln(cmd.OutOrStdout(), "cancelled")
+			fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. easyrice was not upgraded.")
 			return nil
 		}
 	}
@@ -89,6 +89,6 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("upgrade failed: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Upgraded easyrice to %s. Restart easyrice to use the new version.\n", release.Version)
+	fmt.Fprintf(cmd.OutOrStdout(), "Upgraded easyrice to %s. Restart your shell or run easyrice again to use the new version.\n", release.Version)
 	return nil
 }

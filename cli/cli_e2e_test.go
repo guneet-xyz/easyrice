@@ -487,7 +487,7 @@ sources = [{path = "config", mode = "file", target = "$HOME/.config/nvim"}]
 	out, err := runRemoteCmd(t, "init", upstreamA)
 	record("step03 init", out, err)
 	require.NoError(t, err, "init: %s", out)
-	assert.Contains(t, out, "Cloned to")
+	assert.Contains(t, out, "Cloned rice repo to")
 
 	gitDir := filepath.Join(repoRoot, ".git")
 	_, err = os.Stat(gitDir)
@@ -520,7 +520,7 @@ sources = [{path = "config", mode = "file", target = "$HOME/.config/nvim"}]
 	out, err = runRemoteCmd(t, "remote", "add", upstreamB, "--name", "kickstart")
 	record("step05 remote add", out, err)
 	require.NoError(t, err, "remote add: %s", out)
-	assert.Contains(t, out, "Added remote rice")
+	assert.Contains(t, out, "Added remote")
 
 	gitmodules, err := os.ReadFile(filepath.Join(repoRoot, ".gitmodules"))
 	require.NoError(t, err, ".gitmodules must exist after remote add")

@@ -68,7 +68,7 @@ func TestStatus_RepoExistsError(t *testing.T) {
 
 	out, err := runInstallCmd(t, "", "--state", statePath, "status", "mypkg")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "dependency check failed")
+	assert.Contains(t, out, "could not check declared dependencies")
 	assert.Contains(t, out, "check repo")
 }
 
@@ -84,7 +84,7 @@ func TestDoctor_StateLoadError(t *testing.T) {
 
 	out, err := runInstallCmd(t, "", "--state", statePath, "doctor")
 	require.Error(t, err, "out=%s", out)
-	assert.Contains(t, out, "Cannot read state file")
+	assert.Contains(t, out, "State: could not read")
 }
 
 // TestInstall_ExecutePlanError exercises the converge-plan error path when

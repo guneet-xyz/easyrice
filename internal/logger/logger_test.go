@@ -45,7 +45,7 @@ func TestParseLevel(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "invalid log level")
-				assert.Contains(t, err.Error(), "valid values: debug, info, warn, error, critical")
+				assert.Contains(t, err.Error(), "choose one of: debug, info, warn, error, critical")
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.want, got)
@@ -399,7 +399,7 @@ func TestParseLevel_InvalidLevel(t *testing.T) {
 			_, err := ParseLevel(level)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "invalid log level")
-			assert.Contains(t, err.Error(), "valid values: debug, info, warn, error, critical")
+			assert.Contains(t, err.Error(), "choose one of: debug, info, warn, error, critical")
 		})
 	}
 }

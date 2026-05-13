@@ -78,7 +78,7 @@ func Install(ctx context.Context, runner Runner, choices []InstallChoice) ([]Ins
 				)
 			}
 		} else if method.ShellPayload != "" {
-			logger.L.Debug("running shell payload",
+			logger.L.Debug("running shell install payload",
 				zap.String("dep", dep.Name),
 			)
 			result, err = RunShell(ctx, runner, method.ShellPayload)

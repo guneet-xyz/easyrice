@@ -55,7 +55,7 @@ func EnsureDependencies(ctx context.Context, runner deps.Runner, m manifest.Mani
 
 	// Check for version mismatches — abort if found
 	if len(report.Mismatched()) > 0 {
-		fmt.Fprintf(os.Stdout, "Cannot continue: version mismatch (cannot auto-upgrade). Manually upgrade and re-run.\n")
+		fmt.Fprintf(os.Stdout, "Cannot continue because one or more dependencies have the wrong version. Upgrade them manually, then run easyrice again.\n")
 		return s, fmt.Errorf("ensure dependencies: version mismatch detected for package %q", pkgName)
 	}
 

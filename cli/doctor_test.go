@@ -112,7 +112,7 @@ func TestDoctor_MissingSymlink(t *testing.T) {
 	assert.Contains(t, out, "[ERROR]")
 	assert.Contains(t, out, "missing symlink")
 	assert.Contains(t, out, "mypkg")
-	assert.Contains(t, out, "1 issue(s) found")
+	assert.Contains(t, out, "Found 1 issue(s)")
 }
 
 func TestDoctor_ReplacedSymlink(t *testing.T) {
@@ -140,7 +140,7 @@ func TestDoctor_ReplacedSymlink(t *testing.T) {
 	)
 	require.Error(t, err, "out=%s", out)
 	assert.Contains(t, out, "[ERROR]")
-	assert.Contains(t, out, "symlink replaced")
+	assert.Contains(t, out, "symlink was replaced")
 	assert.Contains(t, out, "mypkg")
 }
 
@@ -170,8 +170,8 @@ func TestDoctor_AllPass(t *testing.T) {
 		"doctor",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "[OK] git available")
-	assert.Contains(t, out, "[OK] repo initialized")
+	assert.Contains(t, out, "[OK] Git is available.")
+	assert.Contains(t, out, "[OK] Rice repo is initialized.")
 	assert.Contains(t, out, "All checks passed.")
 }
 
@@ -201,7 +201,7 @@ func TestDoctorReminderAppendedOnHealthyTTY(t *testing.T) {
 		assert.Contains(t, out, "All checks passed.")
 	})
 
-	assert.Contains(t, stderr, "A new release of easyrice is available")
+	assert.Contains(t, stderr, "Update available")
 	assert.Contains(t, stderr, "v2.0.0")
 }
 
@@ -226,7 +226,7 @@ func TestDoctorNoReminderOnFailure(t *testing.T) {
 			"doctor",
 		)
 		require.Error(t, err, "out=%s", out)
-		assert.Contains(t, out, "issue(s) found")
+		assert.Contains(t, out, "issue(s)")
 	})
 
 	assert.False(t, checkCalled, "reminder check must NOT run when doctor reports issues")
@@ -248,7 +248,7 @@ func TestDoctor_LegacyStateDetected(t *testing.T) {
 	)
 
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Warning: Legacy state found")
+	assert.Contains(t, out, "Legacy rice state found")
 	assert.Contains(t, out, legacyStatePath)
 }
 
@@ -290,7 +290,7 @@ func TestDoctor_InvalidManifest(t *testing.T) {
 	// Doctor reports WARN for manifest load errors but doesn't fail
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "[WARN]")
-	assert.Contains(t, out, "Cannot load manifest")
+	assert.Contains(t, out, "could not load rice.toml")
 }
 
 func TestDoctor_DeclaredDepsWarnings(t *testing.T) {
@@ -347,7 +347,7 @@ func TestDoctor_DirtyWarn(t *testing.T) {
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "[WARN]")
 	assert.Contains(t, out, "uncommitted changes")
-	assert.NotContains(t, out, "issue(s) found")
+	assert.NotContains(t, out, "issue(s)")
 }
 
 func TestDoctor_UninitSubmodule(t *testing.T) {
@@ -377,8 +377,8 @@ func TestDoctor_UninitSubmodule(t *testing.T) {
 	)
 	require.Error(t, err, "out=%s", out)
 	assert.Contains(t, out, "[ERROR]")
-	assert.Contains(t, out, "submodule sub not initialized")
-	assert.Contains(t, out, "issue(s) found")
+	assert.Contains(t, out, "Remote sub is not initialized")
+	assert.Contains(t, out, "issue(s)")
 }
 
 func TestDoctor_DanglingImport(t *testing.T) {
@@ -407,7 +407,7 @@ import = "remotes/missing#nvim.default"
 	)
 	require.Error(t, err, "out=%s", out)
 	assert.Contains(t, out, "[ERROR]")
-	assert.Contains(t, out, "package nvim profile default")
+	assert.Contains(t, out, "nvim.default")
 	assert.Contains(t, out, "remotes/missing")
-	assert.Contains(t, out, "issue(s) found")
+	assert.Contains(t, out, "issue(s)")
 }

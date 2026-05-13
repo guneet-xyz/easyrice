@@ -109,7 +109,7 @@ func (u *Updater) CheckCached(ctx context.Context, current string) (*CheckResult
 			CurrentVersion: current,
 		}
 		if saveErr := saveCache(u.opts.CacheDir, seed); saveErr != nil {
-			logger.Debug("updater: seed cache failed", zap.Error(saveErr))
+			logger.Debug("updater cache could not be seeded", zap.Error(saveErr))
 		}
 		return &CheckResult{
 			Current:         current,
@@ -136,7 +136,7 @@ func (u *Updater) CheckCached(ctx context.Context, current string) (*CheckResult
 
 	release, fetchErr := u.FetchLatest(ctx)
 	if fetchErr != nil {
-		logger.Debug("updater: fetch latest failed (fail-silent)", zap.Error(fetchErr))
+		logger.Debug("updater latest-release check failed", zap.Error(fetchErr))
 		return &CheckResult{
 			Current:         current,
 			UpdateAvailable: false,
@@ -150,7 +150,7 @@ func (u *Updater) CheckCached(ctx context.Context, current string) (*CheckResult
 		CurrentVersion: current,
 	}
 	if saveErr := saveCache(u.opts.CacheDir, updated); saveErr != nil {
-		logger.Debug("updater: save cache failed", zap.Error(saveErr))
+		logger.Debug("updater cache could not be saved", zap.Error(saveErr))
 	}
 
 	updateAvailable, cmpErr := IsNewer(current, release.Version)

@@ -8,13 +8,13 @@ import (
 
 func TestFormatReminder(t *testing.T) {
 	got := FormatReminder("v1.0.0", "v1.2.3", "guneet-xyz", "easyrice")
-	want := "A new release of easyrice is available: v1.0.0 \u2192 v1.2.3\nhttps://github.com/guneet-xyz/easyrice/releases/latest"
+	want := "Update available: v1.0.0 → v1.2.3\nRun `rice upgrade` or visit https://github.com/guneet-xyz/easyrice/releases/latest"
 	assert.Equal(t, want, got, "byte-equal mismatch")
 }
 
 func TestFormatReminder_OtherOwnerRepo(t *testing.T) {
 	got := FormatReminder("v0.1.0", "v0.2.0", "acme", "tool")
-	want := "A new release of easyrice is available: v0.1.0 \u2192 v0.2.0\nhttps://github.com/acme/tool/releases/latest"
+	want := "Update available: v0.1.0 → v0.2.0\nRun `rice upgrade` or visit https://github.com/acme/tool/releases/latest"
 	assert.Equal(t, want, got)
 }
 

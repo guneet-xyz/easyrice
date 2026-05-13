@@ -124,7 +124,7 @@ func TestCheckSubmodules_NotInitialized(t *testing.T) {
 
 	assert.Equal(t, 1, issues)
 	assert.Contains(t, buf.String(), "[ERROR]")
-	assert.Contains(t, buf.String(), "submodule sub not initialized")
+	assert.Contains(t, buf.String(), "Remote sub is not initialized")
 	assert.Contains(t, buf.String(), "rice remote update sub")
 }
 
@@ -148,7 +148,7 @@ func TestCheckSubmodules_Modified(t *testing.T) {
 
 	assert.Equal(t, 0, issues, "modified submodule is a warning, not an error")
 	assert.Contains(t, buf.String(), "[WARN]")
-	assert.Contains(t, buf.String(), "submodule sub has local changes")
+	assert.Contains(t, buf.String(), "Remote sub has local changes")
 }
 
 func TestCheckDanglingImports_Missing(t *testing.T) {
@@ -170,7 +170,7 @@ func TestCheckDanglingImports_Missing(t *testing.T) {
 
 	assert.Equal(t, 1, issues)
 	assert.Contains(t, buf.String(), "[ERROR]")
-	assert.Contains(t, buf.String(), "package nvim profile default")
+	assert.Contains(t, buf.String(), "nvim.default")
 	assert.Contains(t, buf.String(), "remotes/kick")
 }
 

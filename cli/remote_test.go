@@ -110,7 +110,7 @@ func TestRemoteAdd_Happy(t *testing.T) {
 
 	out, err := runRemoteCmd(t, "remote", "add", upstream, "--name", "myremote")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Added remote rice")
+	assert.Contains(t, out, "Added remote")
 
 	_, err = os.Stat(filepath.Join(root, ".gitmodules"))
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestRemoteRemove_Happy(t *testing.T) {
 
 	out, err := runRemoteCmd(t, "remote", "remove", "togo")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Removed remote rice")
+	assert.Contains(t, out, "Removed remote")
 
 	_, err = os.Stat(filepath.Join(root, "remotes", "togo"))
 	assert.True(t, os.IsNotExist(err))
@@ -204,7 +204,7 @@ func TestRemoteList_Empty(t *testing.T) {
 
 	out, err := runRemoteCmd(t, "remote", "list")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "No remote rices configured.")
+	assert.Contains(t, out, "No remotes configured.")
 }
 
 func TestRemoteList_WithRemote(t *testing.T) {

@@ -31,6 +31,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if err := repo.Pull(cmd.Context(), dest); err != nil {
 		return fmt.Errorf("pull: %w", err)
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "Pulled latest from origin")
+	fmt.Fprintln(cmd.OutOrStdout(), "Updated rice repo from origin.")
 	return nil
 }

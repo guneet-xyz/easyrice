@@ -80,7 +80,7 @@ func TestStatus_RepoNotInitialized(t *testing.T) {
 	)
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "Rice repo:")
-	assert.Contains(t, out, "Repo not initialized.")
+	assert.Contains(t, out, "Rice repo is not initialized")
 }
 
 func TestStatus_CleanRepo(t *testing.T) {
@@ -99,7 +99,7 @@ func TestStatus_CleanRepo(t *testing.T) {
 	)
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "Rice repo: "+repoRoot)
-	assert.Contains(t, out, "Git: main, clean")
+	assert.Contains(t, out, "Git: branch main, clean")
 	assert.NotContains(t, out, "Tip: commit your rice changes")
 	assert.Contains(t, out, "[OK]")
 	assert.Contains(t, out, "mypkg (profile: common)")
@@ -121,8 +121,8 @@ func TestStatus_DirtyRepo(t *testing.T) {
 		"status",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Git: main, uncommitted change(s)")
-	assert.Contains(t, out, "Tip: commit your rice changes to preserve history")
+	assert.Contains(t, out, "Git: branch main, uncommitted changes")
+	assert.Contains(t, out, "Tip: commit your rice repo changes to preserve history")
 }
 
 func TestStatus_NotInstalled(t *testing.T) {
@@ -219,7 +219,7 @@ func TestStatus_RemotesSection(t *testing.T) {
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "Remotes:")
 	assert.Contains(t, out, "kick")
-	assert.NotContains(t, out, "Remotes: (none)")
+	assert.NotContains(t, out, "Remotes: none")
 }
 
 func TestStatus_NoRemotes(t *testing.T) {
@@ -237,7 +237,7 @@ func TestStatus_NoRemotes(t *testing.T) {
 		"status",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Remotes: (none)")
+	assert.Contains(t, out, "Remotes: none")
 }
 
 func TestStatus_FilterByPackage(t *testing.T) {
@@ -322,7 +322,7 @@ sources = [{path = "x", mode = "file", target = "$HOME"}]
 		"status", "mypkg",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Declared dependencies:")
+	assert.Contains(t, out, "Declared dependencies for mypkg:")
 	assert.NotContains(t, out, "Warning: dependency check failed")
 }
 
@@ -352,5 +352,5 @@ func TestStatus_PrintsBrokenLinkLine(t *testing.T) {
 	)
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "[BROKEN]")
-	assert.Contains(t, out, "BROKEN "+target)
+	assert.Contains(t, out, " broken link: "+target)
 }

@@ -78,7 +78,7 @@ func TestUninstall_StdinNoAborts(t *testing.T) {
 		"uninstall", "mypkg",
 	)
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Aborted.")
+	assert.Contains(t, out, "Cancelled. No changes were made.")
 
 	_, err = os.Lstat(link)
 	require.NoError(t, err, "symlink should still exist after abort")

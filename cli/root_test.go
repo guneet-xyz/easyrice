@@ -30,7 +30,7 @@ func TestInvalidLogLevel(t *testing.T) {
 	err := cmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid log level")
-	assert.Contains(t, err.Error(), "valid values")
+	assert.Contains(t, err.Error(), "choose one of")
 }
 
 func TestHelpContainsFlags(t *testing.T) {

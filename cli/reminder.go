@@ -44,7 +44,7 @@ func maybePrintUpdateReminder() {
 	defer cancel()
 	result, err := reminderCheckFn(ctx, Version)
 	if err != nil {
-		logger.L.Debug("update check: cache error", zap.Error(err))
+		logger.L.Debug("update reminder skipped because the cached check failed", zap.Error(err))
 		return
 	}
 	if result == nil || !result.UpdateAvailable {

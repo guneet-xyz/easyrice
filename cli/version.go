@@ -8,9 +8,9 @@ import (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the rice version",
+	Short: "Print the easyrice version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("easyrice version " + Version)
+		fmt.Fprintln(cmd.OutOrStdout(), "easyrice "+Version)
 		maybePrintUpdateReminder()
 		return nil
 	},

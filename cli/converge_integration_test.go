@@ -194,9 +194,9 @@ func TestIntegration_InstallNoArgs_ConvergesAll(t *testing.T) {
 	out, err := runRemoteCmd(t, "--state", statePath, "--yes", "install", "--profile", "default")
 	require.NoError(t, err, "out=%s", out)
 
-	assert.Contains(t, out, "Installed: alpha")
-	assert.Contains(t, out, "Installed: beta")
-	assert.Contains(t, out, "Installed: gamma")
+	assert.Contains(t, out, "Installed alpha")
+	assert.Contains(t, out, "Installed beta")
+	assert.Contains(t, out, "Installed gamma")
 
 	st, err := state.Load(statePath)
 	require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestIntegration_InstallSameProfile_NoOp(t *testing.T) {
 	out, err := runRemoteCmd(t, "--state", statePath, "--yes",
 		"install", "demo", "--profile", "alpha")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "already converged")
+	assert.Contains(t, out, "is already up to date")
 }
 
 func TestIntegration_InstallRepairsBrokenLink(t *testing.T) {
@@ -302,7 +302,7 @@ func TestIntegration_RemoteAddRemoveLifecycle(t *testing.T) {
 
 	out, err := runRemoteCmd(t, "remote", "add", upstream, "--name", "kick")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Added remote rice")
+	assert.Contains(t, out, "Added remote")
 
 	out, err = runRemoteCmd(t, "remote", "list")
 	require.NoError(t, err, "out=%s", out)
@@ -311,7 +311,7 @@ func TestIntegration_RemoteAddRemoveLifecycle(t *testing.T) {
 
 	out, err = runRemoteCmd(t, "remote", "remove", "kick")
 	require.NoError(t, err, "out=%s", out)
-	assert.Contains(t, out, "Removed remote rice")
+	assert.Contains(t, out, "Removed remote")
 
 	_, statErr := os.Stat(filepath.Join(root, "remotes", "kick"))
 	assert.True(t, os.IsNotExist(statErr), "remotes/kick must be gone")
