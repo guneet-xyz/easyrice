@@ -7,15 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 )
 
 func DefaultRepoPath() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		homeDir, _ := os.UserHomeDir()
-		configDir = filepath.Join(homeDir, ".config")
-	}
-	return filepath.Join(configDir, "easyrice", "repos", "default")
+	return filepath.Join(xdgpath.ConfigDir(), "easyrice", "repos", "default")
 }
 
 func RepoTomlPath(repoRoot string) string {

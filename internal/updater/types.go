@@ -2,9 +2,10 @@ package updater
 
 import (
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 )
 
 // Release represents a GitHub release.
@@ -35,10 +36,5 @@ type Options struct {
 // POSIX: ~/.config/easyrice/update-check.json
 // Windows: %APPDATA%/easyrice/update-check.json
 func DefaultCacheDir() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		homeDir, _ := os.UserHomeDir()
-		configDir = filepath.Join(homeDir, ".config")
-	}
-	return filepath.Join(configDir, "easyrice")
+	return filepath.Join(xdgpath.ConfigDir(), "easyrice")
 }

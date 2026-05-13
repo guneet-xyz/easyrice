@@ -1,0 +1,3 @@
+# internal/xdgpath
+
+`ConfigDir()` returns the platform-appropriate base configuration directory. On POSIX systems (Linux, macOS, etc.), it respects the XDG Base Directory specification: if `$XDG_CONFIG_HOME` is set and is an absolute path, it returns that; otherwise it returns `~/.config`. On Windows, it delegates to `os.UserConfigDir()` and falls back to `%APPDATA%\Roaming` on error. The returned path is always absolute and never includes the string "easyrice" — callers are responsible for appending "easyrice" and any sub-paths themselves. This is the single source of truth for config-directory semantics across the entire codebase; all other packages must use `ConfigDir()` rather than calling `os.UserConfigDir()` directly on POSIX systems.

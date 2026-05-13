@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 )
 
 // InstalledLink represents a single symlink installed by rice.
@@ -33,13 +34,7 @@ type State map[string]PackageState
 // POSIX: ~/.config/easyrice/state.json
 // Windows: %APPDATA%/easyrice/state.json
 func DefaultPath() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		// Fallback to home directory if UserConfigDir fails
-		homeDir, _ := os.UserHomeDir()
-		configDir = filepath.Join(homeDir, ".config")
-	}
-	return filepath.Join(configDir, "easyrice", "state.json")
+	return filepath.Join(xdgpath.ConfigDir(), "easyrice", "state.json")
 }
 
 // Load reads and parses the state file at path.

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +21,7 @@ func setRepoParentAsFile(t *testing.T) {
 	t.Setenv("USERPROFILE", tmp)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 	t.Setenv("AppData", filepath.Join(tmp, "AppData"))
-	cfg, err := os.UserConfigDir()
-	require.NoError(t, err)
+	cfg := xdgpath.ConfigDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(cfg, "easyrice"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(cfg, "easyrice", "repos"), []byte("x"), 0o644))
 }

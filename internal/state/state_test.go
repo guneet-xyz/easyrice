@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,9 +20,8 @@ func TestDefaultPath(t *testing.T) {
 	assert.NotEmpty(t, path)
 	assert.True(t, filepath.IsAbs(path), "DefaultPath should return absolute path")
 
-	configDir, err := os.UserConfigDir()
-	require.NoError(t, err)
-	assert.True(t, len(path) > len(configDir) && path[:len(configDir)] == configDir, "DefaultPath should be in config directory")
+	configDir := xdgpath.ConfigDir()
+	assert.True(t, strings.HasPrefix(path, configDir), "DefaultPath should be in config directory")
 }
 
 func TestLoadNonExistentFile(t *testing.T) {
@@ -272,10 +272,8 @@ func TestDefaultPathFallback(t *testing.T) {
 	assert.Contains(t, path, "easyrice")
 	assert.Contains(t, path, "state.json")
 
-	configDir, err := os.UserConfigDir()
-	if err == nil {
-		assert.True(t, strings.HasPrefix(path, configDir), "DefaultPath should use UserConfigDir when available")
-	}
+	configDir := xdgpath.ConfigDir()
+	assert.True(t, strings.HasPrefix(path, configDir), "DefaultPath should use xdgpath.ConfigDir()")
 }
 
 func TestSaveErrorOnMkdirAllFailure(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/guneet-xyz/easyrice/internal/xdgpath"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -91,16 +92,7 @@ func Init(consoleLevel Level, logFilePath string) error {
 // DefaultLogPath returns ~/.config/easyrice/logs/easyrice.log (POSIX)
 // or %APPDATA%/easyrice/logs/easyrice.log (Windows).
 func DefaultLogPath() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		// Fallback to home directory if UserConfigDir fails
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "easyrice.log"
-		}
-		configDir = filepath.Join(homeDir, ".config")
-	}
-	return filepath.Join(configDir, "easyrice", "logs", "easyrice.log")
+	return filepath.Join(xdgpath.ConfigDir(), "easyrice", "logs", "easyrice.log")
 }
 
 // Sync flushes the logger. Call from PersistentPostRun.
