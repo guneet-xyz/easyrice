@@ -93,9 +93,9 @@ type fakeSourceAsset struct {
 	url  string
 }
 
-func (a *fakeSourceAsset) GetID() int64                { return a.id }
-func (a *fakeSourceAsset) GetName() string             { return a.name }
-func (a *fakeSourceAsset) GetSize() int                { return a.size }
+func (a *fakeSourceAsset) GetID() int64                  { return a.id }
+func (a *fakeSourceAsset) GetName() string               { return a.name }
+func (a *fakeSourceAsset) GetSize() int                  { return a.size }
 func (a *fakeSourceAsset) GetBrowserDownloadURL() string { return a.url }
 
 type fakeSourceRelease struct {
@@ -110,14 +110,14 @@ type fakeSourceRelease struct {
 	assets      []selfupdate.SourceAsset
 }
 
-func (r *fakeSourceRelease) GetID() int64                  { return r.id }
-func (r *fakeSourceRelease) GetTagName() string            { return r.tag }
-func (r *fakeSourceRelease) GetDraft() bool                { return r.draft }
-func (r *fakeSourceRelease) GetPrerelease() bool           { return r.prerelease }
-func (r *fakeSourceRelease) GetPublishedAt() time.Time     { return r.publishedAt }
-func (r *fakeSourceRelease) GetReleaseNotes() string       { return r.notes }
-func (r *fakeSourceRelease) GetName() string               { return r.name }
-func (r *fakeSourceRelease) GetURL() string                { return r.url }
+func (r *fakeSourceRelease) GetID() int64                        { return r.id }
+func (r *fakeSourceRelease) GetTagName() string                  { return r.tag }
+func (r *fakeSourceRelease) GetDraft() bool                      { return r.draft }
+func (r *fakeSourceRelease) GetPrerelease() bool                 { return r.prerelease }
+func (r *fakeSourceRelease) GetPublishedAt() time.Time           { return r.publishedAt }
+func (r *fakeSourceRelease) GetReleaseNotes() string             { return r.notes }
+func (r *fakeSourceRelease) GetName() string                     { return r.name }
+func (r *fakeSourceRelease) GetURL() string                      { return r.url }
 func (r *fakeSourceRelease) GetAssets() []selfupdate.SourceAsset { return r.assets }
 
 type fakeSource struct {

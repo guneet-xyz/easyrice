@@ -132,7 +132,6 @@ func TestIntegration_InstallStatusSwitchUninstall(t *testing.T) {
 		assert.Contains(t, out, "demo")
 	})
 
-
 	t.Run("uninstall_demo", func(t *testing.T) {
 		resetInstallFlags()
 		out, err := runInstallCmd(t, "",

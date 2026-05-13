@@ -271,7 +271,7 @@ func TestDefaultPathFallback(t *testing.T) {
 	assert.True(t, filepath.IsAbs(path), "DefaultPath should always return absolute path")
 	assert.Contains(t, path, "easyrice")
 	assert.Contains(t, path, "state.json")
-	
+
 	configDir, err := os.UserConfigDir()
 	if err == nil {
 		assert.True(t, strings.HasPrefix(path, configDir), "DefaultPath should use UserConfigDir when available")

@@ -15,10 +15,10 @@ import (
 // validating checksums, managing the update cache with TTL, and coordinating atomic binary swaps.
 // The Updater type is injectable and carries state for HTTP client, cache directory, and GitHub credentials.
 type Updater struct {
-	opts            Options
-	fetcher         releaseFetcher
-	swapper         swapper
-	sourceFactory   func() (selfupdate.Source, error)
+	opts          Options
+	fetcher       releaseFetcher
+	swapper       swapper
+	sourceFactory func() (selfupdate.Source, error)
 }
 
 // releaseFetcher abstracts release lookup behind an interface so callers can

@@ -258,9 +258,9 @@ func TestPull_ContextCancelled(t *testing.T) {
 
 func TestRemotePaths(t *testing.T) {
 	cases := []struct {
-		name     string
-		repoRoot string
-		remoteName string
+		name           string
+		repoRoot       string
+		remoteName     string
 		wantRemotesDir string
 		wantRemoteToml string
 	}{

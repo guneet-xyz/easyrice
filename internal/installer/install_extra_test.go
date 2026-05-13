@@ -99,4 +99,3 @@ func TestBuildInstallPlan_NilPkg(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Pkg must not be nil")
 }
-

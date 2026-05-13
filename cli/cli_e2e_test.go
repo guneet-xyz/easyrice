@@ -459,9 +459,9 @@ supported_os = ["linux", "darwin", "windows"]
 sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
 `
 	upstreamA := setupBareUpstreamFromTree(t, "main", map[string]string{
-		"rice.toml":              mainManifest,
-		"ghostty/common/config":  "font-size = 14\n",
-		"nvim/config/init.lua":   "-- main rice nvim\n",
+		"rice.toml":             mainManifest,
+		"ghostty/common/config": "font-size = 14\n",
+		"nvim/config/init.lua":  "-- main rice nvim\n",
 	})
 
 	// ----- step 2: bare upstream B (remote rice, file-mode so overlay works) -----
@@ -475,9 +475,9 @@ supported_os = ["linux", "darwin", "windows"]
 sources = [{path = "config", mode = "file", target = "$HOME/.config/nvim"}]
 `
 	upstreamB := setupBareUpstreamFromTree(t, "kickstart", map[string]string{
-		"rice.toml":              remoteManifest,
-		"nvim/config/init.lua":   "-- kickstart init.lua\n",
-		"nvim/config/lazy.lua":   "-- kickstart lazy.lua\n",
+		"rice.toml":            remoteManifest,
+		"nvim/config/init.lua": "-- kickstart init.lua\n",
+		"nvim/config/lazy.lua": "-- kickstart lazy.lua\n",
 	})
 
 	// ----- step 3: rice init <upstreamA> -----

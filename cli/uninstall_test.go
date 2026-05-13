@@ -231,4 +231,3 @@ func TestUninstall_ExecutePlanError(t *testing.T) {
 	require.Error(t, err, "out=%s", out)
 	assert.Contains(t, err.Error(), "execute plan")
 }
-
