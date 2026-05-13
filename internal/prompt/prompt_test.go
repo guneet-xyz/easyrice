@@ -8,6 +8,7 @@ import (
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/plan"
+	"github.com/guneet-xyz/easyrice/internal/style"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -471,6 +472,48 @@ func TestRenderDepReport_Empty(t *testing.T) {
 	assert.Equal(t, "Dependency check:\n", output)
 }
 
+func TestRenderDepReport_PlainMode(t *testing.T) {
+	style.SetPlain(true)
+	t.Cleanup(func() { style.SetPlain(false) })
+
+	report := deps.DepReport{
+		Entries: []deps.DepReportEntry{
+			{
+				Dep:              deps.ResolvedDependency{Name: "ripgrep"},
+				Status:           deps.DepOK,
+				InstalledVersion: "14.1.0",
+			},
+			{
+				Dep:    deps.ResolvedDependency{Name: "neovim"},
+				Status: deps.DepMissing,
+			},
+			{
+				Dep:              deps.ResolvedDependency{Name: "node", Version: ">=20"},
+				Status:           deps.DepVersionMismatch,
+				InstalledVersion: "18.20.0",
+			},
+			{
+				Dep:              deps.ResolvedDependency{Name: "mdformat"},
+				Status:           deps.DepProbeUnknownVersion,
+				InstalledVersion: "",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderDepReport(&buf, report)
+	output := buf.String()
+
+	assert.Contains(t, output, "OK ripgrep")
+	assert.Contains(t, output, "FAIL neovim")
+	assert.Contains(t, output, "WARN node")
+	assert.Contains(t, output, "? mdformat")
+	assert.Contains(t, output, "--")
+	assert.NotContains(t, output, "✓")
+	assert.NotContains(t, output, "✗")
+	assert.NotContains(t, output, "—")
+}
+
 func TestSelectInstallMethod_AutoAcceptTrue(t *testing.T) {
 	entry := deps.DepReportEntry{
 		Dep: deps.ResolvedDependency{Name: "ripgrep"},
@@ -631,6 +674,26 @@ func TestSelectWithDefault_InvalidInputThenEOF(t *testing.T) {
 	assert.Equal(t, 0, idx)
 }
 
+func TestSelect_PlainMode(t *testing.T) {
+	style.SetPlain(true)
+	t.Cleanup(func() { style.SetPlain(false) })
+
+	in := strings.NewReader("1\n")
+	var out bytes.Buffer
+
+	options := []SelectOption{
+		{Label: "Option A", Description: "First option"},
+		{Label: "Option B", Description: "Second option"},
+	}
+
+	idx, err := SelectWithDefault(in, &out, "Choose", options, 0, false)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, idx)
+	output := out.String()
+	assert.Contains(t, output, "1) Option A -- First option")
+	assert.NotContains(t, output, "—")
+}
+
 func TestRenderDepReport_UnknownStatus(t *testing.T) {
 	report := deps.DepReport{
 		Entries: []deps.DepReportEntry{
@@ -786,4 +849,24 @@ func TestRenderPlan_RemoveDirOps(t *testing.T) {
 	assert.Contains(t, output, "REMOVE-DIR")
 	assert.Contains(t, output, "/home/user/.config/dir")
 	assert.Contains(t, output, "Total: 1 link(s) to remove.")
+}
+
+func TestRenderPlan_PlainMode(t *testing.T) {
+	style.SetPlain(true)
+	t.Cleanup(func() { style.SetPlain(false) })
+
+	p := &plan.Plan{
+		PackageName: "test",
+		Profile:     "default",
+		Ops: []plan.Op{
+			{Kind: plan.OpCreate, Source: "src/file1", Target: "/home/user/.config/file1"},
+		},
+	}
+
+	var buf bytes.Buffer
+	RenderPlan(&buf, p)
+	output := buf.String()
+
+	assert.Contains(t, output, "->")
+	assert.NotContains(t, output, "→")
 }

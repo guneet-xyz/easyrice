@@ -11,6 +11,7 @@ import (
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/plan"
+	"github.com/guneet-xyz/easyrice/internal/style"
 )
 
 // ErrUserDeclined is returned when a user declines a confirmation prompt.
@@ -58,13 +59,17 @@ func RenderPlan(w io.Writer, p *plan.Plan) {
 	// Operations table
 	if len(p.Ops) > 0 {
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		arrow := "→"
+		if style.Plain() {
+			arrow = "->"
+		}
 		for _, op := range p.Ops {
 			if op.Kind == plan.OpCreate {
 				label := "CREATE"
 				if op.IsDir {
 					label = "CREATE-DIR"
 				}
-				fmt.Fprintf(tw, "  %s\t%s\t→\t%s\n", label, op.Target, op.Source)
+				fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", label, op.Target, arrow, op.Source)
 			} else {
 				label := "REMOVE"
 				if op.IsDir {
@@ -155,9 +160,13 @@ func SelectWithDefault(in io.Reader, out io.Writer, label string, options []Sele
 
 	// Print menu
 	fmt.Fprintf(out, "%s\n", label)
+	sep := "—"
+	if style.Plain() {
+		sep = "--"
+	}
 	for i, opt := range options {
 		if opt.Description != "" {
-			fmt.Fprintf(out, "  %d) %s — %s\n", i+1, opt.Label, opt.Description)
+			fmt.Fprintf(out, "  %d) %s %s %s\n", i+1, opt.Label, sep, opt.Description)
 		} else {
 			fmt.Fprintf(out, "  %d) %s\n", i+1, opt.Label)
 		}
@@ -229,13 +238,32 @@ func RenderDepReport(w io.Writer, report deps.DepReport) {
 			status = "unknown"
 		}
 
+		// Apply plain-mode glyph substitution
+		if style.Plain() {
+			switch glyph {
+			case "✓":
+				glyph = "OK"
+			case "✗":
+				glyph = "FAIL"
+			case "!":
+				glyph = "WARN"
+			// "?" stays "?"
+			}
+		}
+
 		// Format version info
 		var versionStr string
 		if entry.InstalledVersion != "" {
 			versionStr = fmt.Sprintf(" (%s)", entry.InstalledVersion)
 		}
 
-		fmt.Fprintf(w, "  %s %s%s — %s\n", glyph, entry.Dep.Name, versionStr, status)
+		// Compute separator
+		sep := "—"
+		if style.Plain() {
+			sep = "--"
+		}
+
+		fmt.Fprintf(w, "  %s %s%s %s %s\n", glyph, entry.Dep.Name, versionStr, sep, status)
 	}
 }
 
