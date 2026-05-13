@@ -1,12 +1,16 @@
 package profile
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/guneet-xyz/easyrice/internal/manifest"
+	"github.com/guneet-xyz/easyrice/internal/repo"
 )
 
 func TestResolveSpecs(t *testing.T) {
@@ -97,7 +101,7 @@ func TestResolveSpecs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResolveSpecs(tt.pkg, tt.pkgName, tt.profileName)
+			got, err := ResolveSpecs("", tt.pkg, tt.pkgName, tt.profileName)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -111,4 +115,116 @@ func TestResolveSpecs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeRiceToml writes a rice.toml file at the given path, creating parent dirs.
+func writeRiceToml(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+}
+
+func TestResolveSpecs_Import(t *testing.T) {
+	t.Run("import only", func(t *testing.T) {
+		root := t.TempDir()
+		remoteRoot := filepath.Join(repo.RemotesDir(root), "kick")
+		writeRiceToml(t, repo.RemoteTomlPath(root, "kick"), `
+schema_version = 1
+
+[packages.nvim]
+description = "nvim"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+`)
+
+		localPkg := &manifest.PackageDef{
+			Profiles: map[string]manifest.ProfileDef{
+				"default": {Import: "remotes/kick#nvim.default"},
+			},
+		}
+		got, err := ResolveSpecs(root, localPkg, "nvim", "default")
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		expectedPath := filepath.Join(remoteRoot, "nvim", "config")
+		assert.Equal(t, expectedPath, got[0].Path)
+		assert.True(t, filepath.IsAbs(got[0].Path))
+		assert.Equal(t, "folder", got[0].Mode)
+		assert.Equal(t, "$HOME/.config/nvim", got[0].Target)
+	})
+
+	t.Run("import plus local overlay", func(t *testing.T) {
+		root := t.TempDir()
+		writeRiceToml(t, repo.RemoteTomlPath(root, "kick"), `
+schema_version = 1
+
+[packages.nvim]
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "file", target = "$HOME/.config/nvim"}]
+`)
+
+		localPkg := &manifest.PackageDef{
+			Profiles: map[string]manifest.ProfileDef{
+				"default": {
+					Import: "remotes/kick#nvim.default",
+					Sources: []manifest.SourceSpec{
+						{Path: "local", Mode: "file", Target: "$HOME/.config/nvim"},
+					},
+				},
+			},
+		}
+		got, err := ResolveSpecs(root, localPkg, "nvim", "default")
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.True(t, filepath.IsAbs(got[0].Path), "imported spec must be absolute")
+		assert.Equal(t, "local", got[1].Path, "local spec must be appended after, unchanged")
+	})
+
+	t.Run("cycle detected", func(t *testing.T) {
+		root := t.TempDir()
+		// remote A imports remote B; remote B imports remote A.
+		writeRiceToml(t, repo.RemoteTomlPath(root, "a"), `
+schema_version = 1
+
+[packages.p]
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.p.profiles.x]
+import = "remotes/b#p.x"
+`)
+		writeRiceToml(t, repo.RemoteTomlPath(root, "b"), `
+schema_version = 1
+
+[packages.p]
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.p.profiles.x]
+import = "remotes/a#p.x"
+`)
+
+		localPkg := &manifest.PackageDef{
+			Profiles: map[string]manifest.ProfileDef{
+				"start": {Import: "remotes/a#p.x"},
+			},
+		}
+		_, err := ResolveSpecs(root, localPkg, "top", "start")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cycle detected")
+	})
+
+	t.Run("missing remote", func(t *testing.T) {
+		root := t.TempDir()
+		localPkg := &manifest.PackageDef{
+			Profiles: map[string]manifest.ProfileDef{
+				"default": {Import: "remotes/ghost#nvim.default"},
+			},
+		}
+		_, err := ResolveSpecs(root, localPkg, "nvim", "default")
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, repo.ErrSubmoduleNotInitialized),
+			"error chain must include ErrSubmoduleNotInitialized; got: %v", err)
+	})
 }
