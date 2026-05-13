@@ -52,7 +52,7 @@ func newRequest(t *testing.T, repoRoot, pkgName, profileName string) InstallRequ
 	require.NoError(t, err)
 	pkg, ok := m.Packages[pkgName]
 	require.True(t, ok, "package %q not found in fixture", pkgName)
-	specs, err := profile.ResolveSpecs(&pkg, pkgName, profileName)
+	specs, err := profile.ResolveSpecs(repoRoot, &pkg, pkgName, profileName)
 	require.NoError(t, err)
 	homeDir := t.TempDir()
 	statePath := filepath.Join(t.TempDir(), "state.json")
@@ -294,4 +294,41 @@ func TestBuildInstallPlan_RootCustom(t *testing.T) {
 		assert.False(t, strings.Contains(op.Source, string(os.PathSeparator)+"nvim"+string(os.PathSeparator)+"config"),
 			"source path must NOT use package name when Root is set, got %q", op.Source)
 	}
+}
+
+// TestBuildInstallPlan_AbsoluteSpecPath verifies that when a SourceSpec.Path
+// is absolute (as produced by the profile resolver for imported specs), the
+// installer uses it directly rather than joining it under the repo root.
+func TestBuildInstallPlan_AbsoluteSpecPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	absSourceDir := filepath.Join(tmpDir, "abs_source")
+	require.NoError(t, os.MkdirAll(absSourceDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(absSourceDir, "file.txt"), []byte("content"), 0o644))
+
+	homeDir := filepath.Join(tmpDir, "home")
+	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+
+	repoRoot := filepath.Join(tmpDir, "repo")
+	require.NoError(t, os.MkdirAll(repoRoot, 0o755))
+
+	req := InstallRequest{
+		RepoRoot:    repoRoot,
+		PackageName: "testpkg",
+		ProfileName: "default",
+		Pkg:         &manifest.PackageDef{Root: "testpkg"},
+		Specs: []manifest.SourceSpec{
+			{Path: absSourceDir, Mode: "file", Target: filepath.Join(homeDir, "config")},
+		},
+		CurrentOS: runtime.GOOS,
+		HomeDir:   homeDir,
+		StatePath: filepath.Join(tmpDir, "state.json"),
+	}
+
+	p, err := BuildInstallPlan(req)
+	require.NoError(t, err)
+	require.Len(t, p.Ops, 1)
+	expectedSource, _ := filepath.Abs(filepath.Join(absSourceDir, "file.txt"))
+	assert.Equal(t, expectedSource, p.Ops[0].Source,
+		"absolute spec.Path must be used directly, not joined under repoRoot")
+	assert.Equal(t, plan.OpCreate, p.Ops[0].Kind)
 }

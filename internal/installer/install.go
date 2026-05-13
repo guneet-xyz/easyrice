@@ -23,14 +23,15 @@ import (
 // PackageDef, performing the OS gate check, and resolving the profile to specs
 // BEFORE invoking BuildInstallPlan/Install.
 type InstallRequest struct {
-	RepoRoot    string
-	PackageName string
-	ProfileName string
-	Pkg         *manifest.PackageDef
-	Specs       []manifest.SourceSpec
-	CurrentOS   string
-	HomeDir     string
-	StatePath   string
+	RepoRoot      string
+	PackageName   string
+	ProfileName   string
+	Pkg           *manifest.PackageDef
+	Specs         []manifest.SourceSpec
+	CurrentOS     string
+	HomeDir       string
+	StatePath     string
+	IgnoreTargets map[string]struct{}
 }
 
 // InstallResult is returned from a successful (or partial) execution.
@@ -103,7 +104,12 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 		if packageRoot == "" {
 			packageRoot = req.PackageName
 		}
-		sourceDir := filepath.Join(req.RepoRoot, packageRoot, spec.Path)
+		var sourceDir string
+		if filepath.IsAbs(spec.Path) {
+			sourceDir = spec.Path
+		} else {
+			sourceDir = filepath.Join(req.RepoRoot, packageRoot, spec.Path)
+		}
 		fi, err := os.Stat(sourceDir)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -219,7 +225,7 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	for _, op := range ops {
 		planned = append(planned, PlannedLink{Source: op.Source, Target: op.Target, IsDir: op.IsDir})
 	}
-	conflicts := DetectConflicts(planned, nil)
+	conflicts := DetectConflicts(planned, req.IgnoreTargets)
 
 	// 8. Build plan
 	p := &plan.Plan{
