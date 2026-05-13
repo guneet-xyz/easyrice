@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,7 +19,7 @@ import (
 
 var statusCmd = &cobra.Command{
 	Use:   "status [package]",
-	Short: "Show installed packages and symlink health",
+	Short: "Show rice repo state, declared-vs-installed packages, and remotes",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runStatus,
 }
@@ -26,53 +28,183 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 }
 
-func runStatus(cmd *cobra.Command, args []string) error {
-	st, err := state.Load(flagState)
-	if err != nil {
-		return fmt.Errorf("load state: %w", err)
-	}
+const (
+	pkgStatusOK            = "OK"
+	pkgStatusBroken        = "BROKEN"
+	pkgStatusNotInstalled  = "NOT INSTALLED"
+	pkgStatusUntrackedInst = "UNTRACKED"
+)
 
-	if len(st) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No packages installed.")
-		return nil
-	}
+func runStatus(cmd *cobra.Command, args []string) error {
+	out := cmd.OutOrStdout()
 
 	filter := ""
 	if len(args) == 1 {
 		filter = args[0]
 	}
 
-	for pkgName, pkgState := range st {
-		if filter != "" && pkgName != filter {
-			continue
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Package: %s (profile: %s)\n", pkgName, pkgState.Profile)
-		for _, link := range pkgState.InstalledLinks {
-			ok, lerr := symlink.IsSymlinkTo(link.Target, link.Source)
-			status := "OK"
-			if lerr != nil || !ok {
-				status = "BROKEN"
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s %s -> %s\n", status, link.Target, link.Source)
-		}
+	repoRoot := repo.DefaultRepoPath()
+	st, err := state.Load(flagState)
+	if err != nil {
+		return fmt.Errorf("load state: %w", err)
+	}
 
-		if len(pkgState.InstalledDependencies) > 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "Installed dependencies:\n")
-			for _, dep := range pkgState.InstalledDependencies {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %s (%s) — via %s\n", dep.Name, dep.Version, dep.Method)
-			}
-		}
+	fmt.Fprintf(out, "Rice repo: %s\n", repoRoot)
 
-		if filter != "" {
-			if err := showDeclaredDependencies(cmd, pkgName); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "Warning: dependency check failed: %v\n", err)
+	exists, existsErr := repo.Exists(repoRoot)
+	if existsErr != nil {
+		fmt.Fprintf(out, "Warning: check repo: %v\n", existsErr)
+	} else if !exists {
+		fmt.Fprintln(out, "Repo not initialized.")
+	}
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+	defer cancel()
+
+	repoUsable := existsErr == nil && exists
+	if repoUsable {
+		renderGitHeader(ctx, out, repoRoot)
+	}
+
+	var mf *manifest.Manifest
+	if repoUsable {
+		if mfLoaded, mfErr := manifest.LoadFile(repo.RepoTomlPath(repoRoot)); mfErr == nil {
+			mf = mfLoaded
+		} else {
+			fmt.Fprintf(out, "Warning: load manifest: %v\n", mfErr)
+		}
+	}
+
+	if repoUsable {
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Packages:")
+
+		pkgNames := collectPackageNames(mf, st, filter)
+		if len(pkgNames) == 0 {
+			fmt.Fprintln(out, "  (none)")
+		} else {
+			for _, name := range pkgNames {
+				renderPackageLine(out, name, mf, st)
 			}
 		}
 	}
+
+	if filter != "" {
+		if depErr := showDeclaredDependencies(cmd, filter); depErr != nil {
+			fmt.Fprintf(out, "Warning: dependency check failed: %v\n", depErr)
+		}
+	}
+
+	if repoUsable {
+		fmt.Fprintln(out, "")
+		renderRemotes(ctx, out, repoRoot)
+	}
+
 	return nil
 }
 
-// showDeclaredDependencies runs a live dependency check for a package and renders the report.
+func renderGitHeader(ctx context.Context, w io.Writer, repoRoot string) {
+	branch, berr := repo.CurrentBranch(ctx, repoRoot)
+	if berr != nil || branch == "" {
+		branch = "unknown"
+	}
+	dirty, derr := repo.HasUncommittedChanges(ctx, repoRoot)
+	if derr != nil {
+		fmt.Fprintf(w, "Git: %s, unknown\n", branch)
+		return
+	}
+	if dirty {
+		fmt.Fprintf(w, "Git: %s, uncommitted change(s)\n", branch)
+		fmt.Fprintf(w, "Tip: commit your rice changes to preserve history (cd %s && git status).\n", repoRoot)
+		return
+	}
+	fmt.Fprintf(w, "Git: %s, clean\n", branch)
+}
+
+func collectPackageNames(mf *manifest.Manifest, st state.State, filter string) []string {
+	seen := map[string]struct{}{}
+	if mf != nil {
+		for name := range mf.Packages {
+			seen[name] = struct{}{}
+		}
+	}
+	for name := range st {
+		seen[name] = struct{}{}
+	}
+	out := make([]string, 0, len(seen))
+	for name := range seen {
+		if filter != "" && name != filter {
+			continue
+		}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func renderPackageLine(w io.Writer, name string, mf *manifest.Manifest, st state.State) {
+	pkgState, installed := st[name]
+	declared := false
+	if mf != nil {
+		_, declared = mf.Packages[name]
+	}
+
+	switch {
+	case !installed:
+		fmt.Fprintf(w, "  [%s]    %s\n", pkgStatusNotInstalled, name)
+	case installed && !declared:
+		fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusUntrackedInst, name, pkgState.Profile)
+	default:
+		broken := brokenLinks(pkgState)
+		if len(broken) > 0 {
+			fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusBroken, name, pkgState.Profile)
+			for _, link := range broken {
+				fmt.Fprintf(w, "    BROKEN %s -> %s\n", link.Target, link.Source)
+			}
+		} else {
+			fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusOK, name, pkgState.Profile)
+		}
+	}
+}
+
+func brokenLinks(pkgState state.PackageState) []state.InstalledLink {
+	var broken []state.InstalledLink
+	for _, link := range pkgState.InstalledLinks {
+		ok, lerr := symlink.IsSymlinkTo(link.Target, link.Source)
+		if lerr != nil || !ok {
+			broken = append(broken, link)
+		}
+	}
+	return broken
+}
+
+func renderRemotes(ctx context.Context, w io.Writer, repoRoot string) {
+	subs, err := repo.SubmoduleList(ctx, repoRoot)
+	if err != nil || len(subs) == 0 {
+		fmt.Fprintln(w, "Remotes: (none)")
+		return
+	}
+	fmt.Fprintln(w, "Remotes:")
+	for _, s := range subs {
+		var label string
+		switch s.State {
+		case repo.SubmoduleInitialized:
+			label = "OK"
+		case repo.SubmoduleNotInitialized:
+			label = "NOT INIT"
+		case repo.SubmoduleModified:
+			label = "MODIFIED"
+		default:
+			label = "?"
+		}
+		sha := s.SHA
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		fmt.Fprintf(w, "  [%s] %s  %s  %s\n", label, s.Name, sha, s.Path)
+	}
+}
+
 func showDeclaredDependencies(cmd *cobra.Command, pkgName string) error {
 	repoRoot := repo.DefaultRepoPath()
 	exists, err := repo.Exists(repoRoot)

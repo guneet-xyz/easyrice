@@ -68,6 +68,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		issues += warnings
 	}
 
+	gitCtx, gitCancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer gitCancel()
+	issues += doctor.CheckRepoClean(gitCtx, out, repoPath)
+	issues += doctor.CheckSubmodules(gitCtx, out, repoPath)
+	if mf != nil {
+		issues += doctor.CheckDanglingImports(out, repoPath, *mf)
+	}
+
 	for pkgName, pkgState := range st {
 		for _, link := range pkgState.InstalledLinks {
 			ok, _ := symlink.IsSymlinkTo(link.Target, link.Source)

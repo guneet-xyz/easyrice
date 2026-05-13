@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +16,27 @@ import (
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/updater"
 )
+
+func initGitRepoAt(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, string(out))
+	}
+	run("init", "-b", "main")
+	run("config", "user.email", "t@t.com")
+	run("config", "user.name", "T")
+	run("config", "commit.gpgsign", "false")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "seed"), []byte("x"), 0o644))
+	run("add", ".")
+	run("commit", "-m", "init")
+}
 
 func setupDoctorRepo(t *testing.T) {
 	t.Helper()
@@ -304,4 +326,88 @@ sources = [{path = "config", mode = "file", target = "$HOME/.config/mypkg"}]
 	require.Error(t, err, "out=%s", out)
 	assert.Contains(t, out, "[WARN]")
 	assert.Contains(t, out, "mypkg")
+}
+
+func TestDoctor_DirtyWarn(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	repoPath := repo.DefaultRepoPath()
+	initGitRepoAt(t, repoPath)
+
+	// Make repo dirty without committing.
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "untracked.txt"), []byte("dirty"), 0o644))
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[WARN]")
+	assert.Contains(t, out, "uncommitted changes")
+	assert.NotContains(t, out, "issue(s) found")
+}
+
+func TestDoctor_UninitSubmodule(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	repoPath := repo.DefaultRepoPath()
+	initGitRepoAt(t, repoPath)
+
+	// Create a bare upstream and add it as a submodule, then deinit.
+	bareURL := makeBareRepo(t, "schema_version = 1\n")
+	subRun := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoPath
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, string(out))
+	}
+	subRun("-c", "protocol.file.allow=always", "submodule", "add", "--", bareURL, "remotes/sub")
+	subRun("commit", "-m", "add submodule")
+	subRun("submodule", "deinit", "-f", "--", "remotes/sub")
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, out, "[ERROR]")
+	assert.Contains(t, out, "submodule sub not initialized")
+	assert.Contains(t, out, "issue(s) found")
+}
+
+func TestDoctor_DanglingImport(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	repoPath := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
+
+	tomlContent := `schema_version = 1
+
+[packages.nvim]
+description = "Neovim with dangling import"
+supported_os = ["linux", "darwin"]
+
+[packages.nvim.profiles.default]
+import = "remotes/missing#nvim.default"
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "rice.toml"), []byte(tomlContent), 0o644))
+
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"doctor",
+	)
+	require.Error(t, err, "out=%s", out)
+	assert.Contains(t, out, "[ERROR]")
+	assert.Contains(t, out, "package nvim profile default")
+	assert.Contains(t, out, "remotes/missing")
+	assert.Contains(t, out, "issue(s) found")
 }

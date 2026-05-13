@@ -262,30 +262,6 @@ func runInstallOne(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 		}
 	}
 
-	// Emit outcome-specific message before confirm prompt
-	switch cr.Outcome {
-	case installer.OutcomeProfileSwitched:
-		fmt.Fprintf(out, "Switching %s: %s → %s\n", pkgName, cr.OldProfile, cr.NewProfile)
-	case installer.OutcomeRepaired:
-		fmt.Fprintf(out, "Repairing %s (%d broken links)\n", pkgName, len(cr.Plan.Ops))
-	case installer.OutcomeNoOp:
-		fmt.Fprintf(out, "%s already converged\n", pkgName)
-		return nil // skip confirm + execute
-	case installer.OutcomeInstalled:
-		fmt.Fprintf(out, "Installing %s (profile: %s)\n", pkgName, cr.NewProfile)
-	}
-
-	if cr.Outcome != installer.OutcomeNoOp && !flagYes {
-		ok, err := prompt.Confirm(cmd.InOrStdin(), out, "Proceed?")
-		if err != nil {
-			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Aborted.")
-			return nil
-		}
-	}
-
 	if err := installer.ExecuteConvergePlan(req, cr); err != nil {
 		return fmt.Errorf("execute plan: %w", err)
 	}
@@ -320,14 +296,15 @@ func renderConflictsPlan(w io.Writer, req installer.ConvergeRequest) {
 		return
 	}
 	p, _ := installer.BuildInstallPlan(installer.InstallRequest{
-		RepoRoot:    req.RepoRoot,
-		PackageName: req.PackageName,
-		ProfileName: req.RequestedProfile,
-		Pkg:         req.Pkg,
-		Specs:       specs,
-		CurrentOS:   req.CurrentOS,
-		HomeDir:     req.HomeDir,
-		StatePath:   req.StatePath,
+		RepoRoot:      req.RepoRoot,
+		PackageName:   req.PackageName,
+		ProfileName:   req.RequestedProfile,
+		Pkg:           req.Pkg,
+		Specs:         specs,
+		CurrentOS:     req.CurrentOS,
+		HomeDir:       req.HomeDir,
+		StatePath:     req.StatePath,
+		IgnoreTargets: nil,
 	})
 	if p != nil {
 		prompt.RenderPlan(w, p)
