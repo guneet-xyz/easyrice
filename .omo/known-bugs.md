@@ -232,148 +232,104 @@ Every entry follows this exact template. Copy it verbatim when adding a new entr
 **Repro**: No test exists; this entry is illustrative only.
 **How we know test is correct**: N/A, this row is a format demonstration and is deleted once real entries land.
 
-## BUG-080 — ErrDevBuild short-circuits CheckCached
-**Status**: passing
+## BUG-001 — Load on invalid JSON returns unwrapped error without path
+**Status**: failing
+**Severity**: S3
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_001_InvalidJSON_WrappedErrorMentionsPath
+**Spec source**: `.omo/plans/better-tests.md` L923; AGENTS.md "Errors wrap with fmt.Errorf(\"context: %w\", err) - always"
+**Expected**: Load wraps the parse error and mentions the state file path so users can locate the bad file.
+**Actual**: Load returns the bare `json.Unmarshal` error (e.g. `invalid character '{' looking for beginning of object key string`) — no path, no wrapping.
+**Repro**: `go test -race -run TestState_Corruption_BUG_001 ./internal/state/...`
+**How we know test is correct**: AGENTS.md mandates `fmt.Errorf("context: %w", err)` wrapping repo-wide; a file-format error without the file path is a documented anti-pattern.
+
+## BUG-002 — Load on top-level JSON array returns generic type error
+**Status**: failing
+**Severity**: S3
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_002_NotAMap_ClearObjectError
+**Spec source**: `.omo/plans/better-tests.md` L924; AGENTS.md "State File" — top-level is a JSON object keyed by package name.
+**Expected**: Load returns a clear "state file is not a JSON object/map" error citing the schema.
+**Actual**: Load returns `json: cannot unmarshal array into Go value of type state.State` — no recovery hint, no mention of the expected shape.
+**Repro**: `go test -race -run TestState_Corruption_BUG_002 ./internal/state/...`
+**How we know test is correct**: the type `State map[string]PackageState` makes an array structurally invalid; the user needs to know whether to delete or hand-repair.
+
+## BUG-003 — Load silently accepts JSON `null` as empty state
+**Status**: failing
 **Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_080_DevBuild
-**Spec source**: `internal/updater/cache.go:88-95`, `internal/updater/errors.go:6` (`ErrDevBuild`), `internal/updater/AGENTS.md` ("dev builds short-circuit")
-**Expected**: `CheckCached("dev")` returns `UpdateAvailable=false` without invoking the fetcher and without writing to the cache.
-**Actual**: Behaves as expected; mocked fetcher records 0 calls and cache file is absent.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_080' ./internal/updater/...`
-**How we know test is correct**: Mocked fetcher counts invocations; cache file path is asserted absent via `os.Stat`.
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_003_NullJSON_ClearError
+**Spec source**: `.omo/plans/better-tests.md` L925.
+**Expected**: Load returns a clear error explaining the file is `null` (corruption, not empty install).
+**Actual**: `json.Unmarshal("null", &s)` leaves `s` as nil; Load returns `(map[]{}, nil)` silently — caller treats it as "nothing installed" and may reinstall over existing symlinks (tracking loss).
+**Repro**: `go test -race -run TestState_Corruption_BUG_003 ./internal/state/...`
+**How we know test is correct**: a `null` state file is corruption by inspection; treating it as empty is a footgun adjacent to data loss.
 
-## BUG-081 — ErrAlreadyLatest when fetcher reports same semver
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_081_AlreadyLatest
-**Spec source**: `internal/updater/errors.go:7` (`ErrAlreadyLatest`), `internal/updater/fetch.go:60-67`, `internal/updater/version.go:35-48`
-**Expected**: Fetcher returning the same semver as current produces `UpdateAvailable=false`; the sentinel itself propagates verbatim through `FetchLatest`.
-**Actual**: Behaves as expected.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_081' ./internal/updater/...`
-**How we know test is correct**: Two complementary assertions — `CheckCached` integration path and direct `FetchLatest` sentinel propagation — cover both surfaces.
-
-## BUG-082 — ErrLockBusy prevents binary mutation
-**Status**: passing
-**Severity**: S1
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_082_LockBusy
-**Spec source**: `internal/updater/errors.go:8` (`ErrLockBusy`), `internal/updater/lock.go:35-51`, `internal/updater/swap.go:36-39`
-**Expected**: When `upgrade.lock` exists fresh, `Apply` returns `ErrLockBusy` and never calls the swapper.
-**Actual**: Behaves as expected.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_082' ./internal/updater/...`
-**How we know test is correct**: `mockedSwapper.calls` is asserted == 0 AND a sentinel marker file in the cache dir is verified unchanged.
-
-## BUG-083 — ErrNoChecksum surfaces from FetchLatest
-**Status**: passing
-**Severity**: S1
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_083_NoChecksum
-**Spec source**: `internal/updater/errors.go:9` (`ErrNoChecksum`), `internal/updater/fetch.go:69-72`, `internal/updater/AGENTS.md` (fail-closed checksum gate)
-**Expected**: Releases without a checksums.txt asset are rejected with `ErrNoChecksum`.
-**Actual**: Behaves as expected; mocked fetcher returning the sentinel is passed through verbatim.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_083' ./internal/updater/...`
-**How we know test is correct**: `errors.Is(err, ErrNoChecksum)` is the canonical CLI match path.
-
-## BUG-084 — ErrCacheCorrupt detected and recovered
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_084_CacheCorrupt
-**Spec source**: `internal/updater/cache.go:30-48`, `internal/updater/cache.go:97-103`, `internal/updater/errors.go:10`
-**Expected**: Invalid JSON in `update-check.json` produces `ErrCacheCorrupt` from `loadCache`; `CheckCached` swallows the sentinel and re-seeds a fresh cache.
-**Actual**: Behaves as expected; cache is re-seeded with current version after corrupt detection.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_084' ./internal/updater/...`
-**How we know test is correct**: Two-step assertion — direct `loadCache` sentinel match, then `CheckCached` no-error path with re-seeded cache verified by a second `loadCache`.
-
-## BUG-085 — ErrInvalidSemver wraps non-semver tags
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_085_InvalidSemver
-**Spec source**: `internal/updater/errors.go:11` (`ErrInvalidSemver`), `internal/updater/version.go:35-48`
-**Expected**: `IsNewer` returns a wrapped `ErrInvalidSemver` when either argument fails `semver.IsValid` after normalization.
-**Actual**: Behaves as expected for both invalid-latest and invalid-current inputs.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_085' ./internal/updater/...`
-**How we know test is correct**: Both directions (invalid latest, invalid current) are independently asserted via `errors.Is`.
-
-## BUG-086 — Pre-release tags rejected
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_086_PreReleaseRejected
-**Spec source**: `internal/updater/version.go:50-55`, `internal/updater/AGENTS.md` ("rejects pre-releases")
-**Expected**: `IsPreRelease` classifies `vX.Y.Z-beta.N` and `vX.Y.Z-rc.N` as pre-releases; bare `vX.Y.Z` is NOT a pre-release.
-**Actual**: Behaves as expected.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_086' ./internal/updater/...`
-**How we know test is correct**: Both rejecting (beta, rc) and accepting (stable) inputs are asserted, preventing false positives.
-
-## BUG-087 — Network failure is fail-silent
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_087_NetworkFailureFailSilent
-**Spec source**: `internal/updater/cache.go:137-145`, `internal/updater/AGENTS.md` ("CheckCached: fail-silent network")
-**Expected**: A fetcher error (e.g. `connection refused`) does NOT bubble out of `CheckCached`; the result is `UpdateAvailable=false`.
-**Actual**: Behaves as expected; `nil` error returned and `UpdateAvailable=false`.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_087' ./internal/updater/...`
-**How we know test is correct**: Mocked fetcher injects a vanilla network error and `require.NoError` proves the swallow contract.
-
-## BUG-088 — Atomic swap rollback on mid-flight failure
-**Status**: passing
-**Severity**: S1
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_088_AtomicSwapRollback
-**Spec source**: `internal/updater/swap.go:54-58`, `internal/updater/AGENTS.md` ("Atomic binary swap; never re-execs")
-**Expected**: If the swapper fails mid-way, `Apply` propagates a wrapped error, the running binary stays in pre-swap state, and the lockfile is released.
-**Actual**: Behaves as expected; the sentinel binary file is unchanged and the lockfile is gone.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_088' ./internal/updater/...`
-**How we know test is correct**: Triple assertion — error contains underlying message, binary file bytes unchanged via `os.ReadFile`, lockfile path absent via `os.Stat`.
-
-## BUG-089 — CleanupOrphanArtifacts removes .new/.old siblings
+## BUG-004 — Load does not validate PackageState.Profile non-empty
 **Status**: passing
 **Severity**: S3
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_089_CleanupOrphanArtifacts
-**Spec source**: `internal/updater/cleanup.go:14-40`, `internal/updater/AGENTS.md` ("Removes .new/.old siblings")
-**Expected**: `.new` removed on all OSes; `.old` removed only on non-Windows. Idempotent. Never touches the real binary.
-**Actual**: Behaves as expected.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_089' ./internal/updater/...`
-**How we know test is correct**: Per-OS branch via `runtime.GOOS`, second invocation asserts idempotency, real binary bytes asserted unchanged.
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_004_MissingFields_RejectsEmptyProfile
+**Spec source**: `.omo/plans/better-tests.md` L926; AGENTS.md "State File" example shows `"profile"` as a required field.
+**Expected**: Load explicitly validates that each PackageState has non-empty Profile and names the offending package.
+**Actual**: Load returns an error, BUT for the wrong reason: an empty `installed_at` string fails `time.Time` parsing. If `installed_at` were valid (e.g. omitted with `omitempty`), an empty profile would slip through silently. Test currently passes by coincidence; bug still exists in spirit.
+**Repro**: `go test -race -run TestState_Corruption_BUG_004 ./internal/state/...`
+**How we know test is correct**: assertion is the minimum required (`err != nil`); the by-the-wrong-reason behavior is documented here so future schema changes (e.g., `omitempty` on `installed_at`) won't silently flip this test into a real bug regression.
 
-## BUG-090 — 24h TTL boundary is exact
-**Status**: passing
-**Severity**: S2
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_090_TTLBoundary
-**Spec source**: `internal/updater/cache.go:19` (`cacheTTL = 24h`), `internal/updater/cache.go:122-135` (`now.Sub(c.LastChecked) > cacheTTL`)
-**Expected**: At T=23h59m the cache is fresh (no fetch); at T=24h01m it is stale (fetch happens exactly once).
-**Actual**: Behaves as expected via a `mockedClock` advancing through the boundary.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_090' ./internal/updater/...`
-**How we know test is correct**: Same `*Updater` instance is reused across both boundary checks so fetcher-call-count accumulates deterministically.
-
-## BUG-091 — FormatReminder contains version + URL
-**Status**: passing
+## BUG-005 — Load on partial write returns parse error without recovery guidance
+**Status**: failing
 **Severity**: S3
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_091_FormatReminder
-**Spec source**: `internal/updater/reminder.go:10-17`
-**Expected**: Reminder output is exactly 2 lines and contains current version, latest version, and the canonical `https://github.com/<owner>/<repo>/releases/latest` URL.
-**Actual**: Behaves as expected.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_091' ./internal/updater/...`
-**How we know test is correct**: Four `assert.Contains` checks plus a line-count assertion lock the format down.
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_005_PartialWrite_RecoveryHint
+**Spec source**: `.omo/plans/better-tests.md` L927.
+**Expected**: Error wraps the parse error AND includes a recovery hint (backup/repair/recover guidance).
+**Actual**: Load returns the bare `unexpected end of JSON input` — actionable for nobody.
+**Repro**: `go test -race -run TestState_Corruption_BUG_005 ./internal/state/...`
+**How we know test is correct**: torn writes are a known crash-recovery scenario; users hitting this corruption need actionable guidance.
 
-## BUG-092 — Non-TTY suppresses reminder
-**Status**: passing
+## BUG-006 — Load on truncated state returns parse error without file path
+**Status**: failing
 **Severity**: S3
-**Package**: internal/updater
-**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_092_NonTTYNoReminder
-**Spec source**: `internal/updater/reminder.go:26-43`
-**Expected**: `IsTerminal` returns false for a regular file; `ShouldShowReminder` returns false unless disabled=false AND current is tagged AND isStderrTTY=true.
-**Actual**: Behaves as expected for all four gates.
-**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_092' ./internal/updater/...`
-**How we know test is correct**: Truth-table exhaustion of the three boolean gates plus the IsTerminal probe.
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_006_Truncated_PathInError
+**Spec source**: `.omo/plans/better-tests.md` L928.
+**Expected**: Error wraps the json error AND mentions the state file path.
+**Actual**: Bare `unexpected end of JSON input` with no path context — same wrapping gap as BUG-001.
+**Repro**: `go test -race -run TestState_Corruption_BUG_006 ./internal/state/...`
+**How we know test is correct**: same as BUG-001; AGENTS.md mandates wrapping with context.
+
+## BUG-007 — Save is non-atomic: partial-write fault corrupts the final state.json
+**Status**: failing
+**Severity**: S1
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_007_Save_Atomicity
+**Spec source**: `.omo/plans/better-tests.md` L929; first-principles argument — atomic write (tmp+rename) is industry standard for any state file that survives crashes.
+**Expected**: After a faulted Save, the final state.json contains either fully OLD or fully NEW content — never partial.
+**Actual**: Save calls `os.WriteFile` directly on the final path. A partial-then-ENOSPC fault leaves the final state.json with the first N bytes only (observed: 16 bytes of `{\n  "nvim": {\n  `). Pure data corruption: an unrelated power loss during write destroys the install ledger.
+**Repro**: `go test -race -run TestState_Corruption_BUG_007 ./internal/state/...`
+**How we know test is correct**: we control both old and new byte sequences; any other content on disk is by definition torn. The fault is injected through the `stateWriteFile` seam introduced in this task.
+
+## BUG-008 — Save does not surface EACCES via the stateOpenFile seam
+**Status**: failing
+**Severity**: S3
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_008_Save_EACCES_ClearError
+**Spec source**: `.omo/plans/better-tests.md` L930.
+**Expected**: An atomic Save implementation opens the final (or temp) path via `stateOpenFile`, so an EACCES injection at that path propagates with a clear permission error.
+**Actual**: Save uses `stateWriteFile` only; the `stateOpenFile` seam is never invoked. The EACCES injection has no effect and Save succeeds. This is a documented gap demonstrating that no atomic-open code path exists.
+**Repro**: `go test -race -run TestState_Corruption_BUG_008 ./internal/state/...`
+**How we know test is correct**: an industry-standard atomic Save would route through OpenFile; the fact that the injected fault has no effect proves the gap.
+
+## BUG-009 — Save does not surface ENOSPC via the stateOpenFile seam
+**Status**: failing
+**Severity**: S3
+**Package**: internal/state
+**Test**: internal/state/state_corruption_test.go:TestState_Corruption_BUG_009_Save_ENOSPC_ClearError
+**Spec source**: `.omo/plans/better-tests.md` L931.
+**Expected**: Save opens via `stateOpenFile` and surfaces ENOSPC as a clear "no space left on device" error.
+**Actual**: Save uses `stateWriteFile` only; the `stateOpenFile` ENOSPC injection has no effect and Save succeeds (the underlying real disk has space). Same root cause as BUG-008.
+**Repro**: `go test -race -run TestState_Corruption_BUG_009 ./internal/state/...`
+**How we know test is correct**: parallel argument to BUG-008.
 
 ## Verification
 
@@ -568,3 +524,146 @@ When a block fills up, extend it in increments of 20 and update this section in 
 **Actual**: LoadFile wraps the os error preserving the path and "permission denied" text from the underlying syscall
 **Repro**: chmod 000 on rice.toml; call LoadFile; skip if root
 **How we know test is correct**: a permission-denied error without a path is unactionable; the wrap convention guarantees both
+
+## BUG-080 — CheckCached on dev build must short-circuit before any I/O
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_080_DevBuildShortCircuit
+**Spec source**: AGENTS.md updater code map — `IsDevBuild` + `ErrDevBuild` contract; `CheckCached` MUST be fail-silent and not call the network for dev builds.
+**Expected**: `CheckCached("dev")` returns `UpdateAvailable=false`, no error, fetcher.calls == 0, no cache file written.
+**Actual**: returns clean result; `mockedFetcher.calls == 0`; `os.Stat(cachePath)` reports `IsNotExist`.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_080 ./internal/updater/...`
+**How we know test is correct**: dev builds have no semver, so any release comparison is meaningless; spec mandates the short-circuit.
+
+## BUG-081 — FetchLatest must propagate ErrAlreadyLatest verbatim
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_081_AlreadyLatest
+**Spec source**: AGENTS.md updater errors — `ErrAlreadyLatest` is a sentinel for "fetched release == current".
+**Expected**: when fetcher returns same semver as current, `FetchLatest` errors with `errors.Is(err, ErrAlreadyLatest)` and `UpdateAvailable=false`.
+**Actual**: fake fetcher returns v1.0.0 against current v1.0.0; sentinel preserved through wrapping.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_081 ./internal/updater/...`
+**How we know test is correct**: CLI maps this sentinel to a user-facing "already on the latest version" message; losing it breaks UX.
+
+## BUG-082 — Apply must return ErrLockBusy when upgrade.lock is held
+**Status**: passing
+**Severity**: S1
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_082_LockBusy
+**Spec source**: AGENTS.md updater code map — `(*Updater).Apply` "holds upgrade lock"; `ErrLockBusy` sentinel.
+**Expected**: with a pre-existing live lockfile, `Apply` returns `ErrLockBusy`; swapper NEVER invoked; binary unchanged.
+**Actual**: mockedLocker reports busy → `Apply` returns sentinel; `mockedSwapper.calls == 0`; binary bytes unchanged.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_082 ./internal/updater/...`
+**How we know test is correct**: concurrent `rice upgrade` invocations must not race on the binary; the lock+sentinel is the documented mechanism.
+
+## BUG-083 — FetchLatest must reject releases without checksums.txt
+**Status**: passing
+**Severity**: S1
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_083_NoChecksum
+**Spec source**: AGENTS.md updater code map — "rejects … assets without checksums.txt"; `ErrNoChecksum` sentinel.
+**Expected**: when fetcher returns a release with empty Checksums map, `FetchLatest` errors `errors.Is(err, ErrNoChecksum)`.
+**Actual**: sentinel surfaced verbatim through fetch path.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_083 ./internal/updater/...`
+**How we know test is correct**: unverified binaries are a supply-chain risk; refusing the release is the only safe behaviour.
+
+## BUG-084 — loadCache returns ErrCacheCorrupt; CheckCached swallows and re-seeds
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_084_CacheCorrupt
+**Spec source**: AGENTS.md updater code map — `ErrCacheCorrupt` sentinel; `CheckCached` is "fail-silent on network errors" and self-healing on cache corruption.
+**Expected**: invalid JSON → `loadCache` returns `errors.Is(err, ErrCacheCorrupt)`; `CheckCached` swallows it, re-fetches via the mocked fetcher, and re-seeds a valid cache reflecting the current version.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_084 ./internal/updater/...`
+**How we know test is correct**: a corrupt cache must not be a permanent failure mode; self-heal is documented behaviour.
+
+## BUG-085 — IsNewer wraps ErrInvalidSemver for non-semver inputs
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_085_InvalidSemver
+**Spec source**: AGENTS.md updater code map — `IsNewer` uses `golang.org/x/mod/semver`; `ErrInvalidSemver` sentinel.
+**Expected**: both `IsNewer("not-a-version", "v1.0.0")` and `IsNewer("v1.0.0", "garbage")` return errors satisfying `errors.Is(err, ErrInvalidSemver)`.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_085 ./internal/updater/...`
+**How we know test is correct**: silently accepting bad tags would make every comparison meaningless; the sentinel is the documented contract.
+
+## BUG-086 — IsPreRelease detects -beta.N / -rc.N suffixes
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_086_PreReleaseRejected
+**Spec source**: AGENTS.md updater code map — `FetchLatest` "rejects pre-releases".
+**Expected**: `IsPreRelease("v1.0.0-beta.1")` and `IsPreRelease("v1.0.0-rc.2")` true; `IsPreRelease("v1.0.0")` false.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_086 ./internal/updater/...`
+**How we know test is correct**: the rejection upstream depends on this classifier; stable releases must NOT match.
+
+## BUG-087 — CheckCached is fail-silent on network failure
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_087_NetworkFailureFailSilent
+**Spec source**: AGENTS.md updater code map — `CheckCached` "fail-silent on network errors".
+**Expected**: when stale cache forces a re-fetch and the fetcher returns a network error, `CheckCached` returns `nil` error, `UpdateAvailable=false`, and the fetcher was called exactly once.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_087 ./internal/updater/...`
+**How we know test is correct**: an offline user must not see scary errors from a background check; the contract is "best-effort".
+
+## BUG-088 — Apply propagates swapper error, releases lock, leaves binary untouched
+**Status**: passing
+**Severity**: S1
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_088_AtomicSwapRollback
+**Spec source**: AGENTS.md anti-patterns: atomic swap; `(*Updater).Apply` "atomic binary swap".
+**Expected**: when `swapper.Swap` returns an error mid-way, `Apply` returns a wrapped error, binary bytes are unchanged on disk, and the lockfile is released (`mockedLocker.releases == 1`).
+**Actual**: matches expected; underlying error surfaces via `errors.Is`.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_088 ./internal/updater/...`
+**How we know test is correct**: a half-applied upgrade is the worst-case failure; the contract guarantees rollback semantics from the caller's perspective.
+
+## BUG-089 — CleanupOrphanArtifacts removes .new everywhere, .old on non-Windows only
+**Status**: passing
+**Severity**: S3
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_089_CleanupOrphanArtifacts
+**Spec source**: AGENTS.md updater code map — `CleanupOrphanArtifacts` "removes `.new`/`.old` siblings left by interrupted swaps".
+**Expected**: `.new` sibling removed on all OSes; `.old` removed on non-Windows but preserved on Windows (file-in-use semantics); idempotent on a clean dir; real binary never touched.
+**Actual**: matches expected; `runtime.GOOS` branch validated.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_089 ./internal/updater/...`
+**How we know test is correct**: leftover `.new` files from crashed upgrades accumulate; cleanup must be safe and idempotent.
+
+## BUG-090 — CheckCached respects the 24h TTL boundary
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_090_TTLBoundary
+**Spec source**: AGENTS.md updater code map — `CheckCached` "24h-TTL cached check".
+**Expected**: within TTL (23h59m elapsed) the fetcher is NOT called and cache is used; beyond TTL (24h01m) the fetcher is called exactly once and the result reflects the new release.
+**Actual**: matches expected via a controllable `mockedClock`.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_090 ./internal/updater/...`
+**How we know test is correct**: the TTL is the whole point of the cache; testing both sides of the boundary pins the behaviour.
+
+## BUG-091 — FormatReminder includes current, latest, and releases URL on 2 lines
+**Status**: passing
+**Severity**: S3
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_091_FormatReminder
+**Spec source**: AGENTS.md updater code map — `FormatReminder` "Pure helpers for the post-command update reminder".
+**Expected**: reminder text contains the current version, the latest version, and the canonical `github.com/guneet-xyz/easyrice/releases` URL; exactly 2 non-empty lines.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_091 ./internal/updater/...`
+**How we know test is correct**: the reminder is the only user-visible artifact of the cached check; its shape is part of the UX contract.
+
+## BUG-092 — ShouldShowReminder suppresses on non-TTY, dev build, or explicit disable
+**Status**: passing
+**Severity**: S3
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_092_NonTTYNoReminder
+**Spec source**: AGENTS.md updater code map — `ShouldShowReminder` + `IsTerminal` helpers.
+**Expected**: a regular file is NOT a terminal; non-TTY stderr suppresses the reminder; dev build suppresses even on a TTY; explicit disable suppresses even on a TTY; only tagged build + TTY + not-disabled shows the reminder.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestUpdater_Mocked/BUG_092 ./internal/updater/...`
+**How we know test is correct**: noisy reminders in pipes/CI break tool composition; the suppression matrix is the documented behaviour.
