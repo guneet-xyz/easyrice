@@ -667,3 +667,124 @@ When a block fills up, extend it in increments of 20 and update this section in 
 **Actual**: matches expected.
 **Repro**: `go test -race -run TestUpdater_Mocked/BUG_092 ./internal/updater/...`
 **How we know test is correct**: noisy reminders in pipes/CI break tool composition; the suppression matrix is the documented behaviour.
+
+## BUG-120 — installer skips symlinks inside source trees
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-120-SourceIsSymlink
+**Spec source**: `.omo/plans/better-tests.md` line 1578; `AGENTS.md` NOTES/GOTCHAS ("Symlinks inside source trees are skipped during walk — we only manage real files")
+**Expected**: BuildInstallPlan walks the source directory and SKIPS any entries that are themselves symlinks; no plan Op has the symlink as Source.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-120 ./internal/installer/...`
+**How we know test is correct**: managing a symlink-as-source would let an attacker-controlled link redirect install to arbitrary files; the AGENTS.md contract is explicit about skipping.
+
+## BUG-121 — installer silently follows a symlinked source root
+**Status**: failing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-121-SourceRootIsSymlink
+**Spec source**: `.omo/plans/better-tests.md` line 1579; first-principles defense-in-depth + the existing walk-skips-symlinks rule
+**Expected**: BuildInstallPlan rejects a source directory whose ROOT is a symlink with a clear "source path must be a real directory, not a symlink" error.
+**Actual**: BuildInstallPlan returns no error — `os.Stat` follows the root symlink and the walk proceeds. Attacker-controlled redirect at the package root is silently honored.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-121 ./internal/installer/...`
+**How we know test is correct**: BUG-120 proves the "skip symlinks" rule applies to ENTRIES inside the walk; the rule must extend to the walk's STARTING point or it is trivially bypassable.
+
+## BUG-122 — DetectConflicts reports dangling symlinks as conflicts
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-122-BrokenSymlinkAtTarget
+**Spec source**: `.omo/plans/better-tests.md` line 1580; `AGENTS.md` CONFLICT SEMANTICS table
+**Expected**: a pre-existing dangling symlink at the planned target produces a Conflict (not silently overwritten).
+**Actual**: matches expected — DetectConflicts uses `os.Lstat` and reports the symlink-points-to-X case.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-122 ./internal/installer/...`
+**How we know test is correct**: silent replacement of a user-owned dangling link could destroy intentional pointers the user maintains for other tooling.
+
+## BUG-123 — install/uninstall round-trip with spaces in path
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-123-SpacesInPath
+**Spec source**: `.omo/plans/better-tests.md` line 1581
+**Expected**: target `$HOME/My Configs/...` installs, uninstalls, and round-trips through state.json without mangling.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-123 ./internal/installer/...`
+**How we know test is correct**: macOS users routinely have `~/My Documents`/`~/Application Support` style paths; failing on them would block adoption.
+
+## BUG-124 — install/uninstall round-trip with unicode in path
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-124-UnicodeInPath
+**Spec source**: `.omo/plans/better-tests.md` line 1582
+**Expected**: target containing `日本語` installs and round-trips through state.json byte-identically.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-124 ./internal/installer/...`
+**How we know test is correct**: Go strings + JSON state use UTF-8 throughout; any encoding bug would surface as a diff in the round-trip equality check.
+
+## BUG-125 — install/uninstall round-trip with shell metacharacters
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-125-ShellMetacharsInPath
+**Spec source**: `.omo/plans/better-tests.md` line 1583
+**Expected**: characters `;` and `` ` `` (unexpanded by `os.ExpandEnv` because not part of a valid $VAR sequence) survive round-trip unchanged.
+**Actual**: matches expected.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-125 ./internal/installer/...`
+**How we know test is correct**: `os.ExpandEnv` only consumes `$NAME`/`${NAME}` sequences; bare shell metacharacters must round-trip literally.
+
+## BUG-126 — long path misclassified as "conflict" instead of PATH_MAX error
+**Status**: failing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-126-LongPath
+**Spec source**: `.omo/plans/better-tests.md` line 1584
+**Expected**: install with a target near PATH_MAX (4096 on Linux) returns an error mentioning PATH_MAX / "name too long" / "long"; never panics.
+**Actual**: install does NOT panic (the recover() guard never fires), but the underlying ENAMETOOLONG from `os.MkdirAll`/`os.Lstat` surfaces as the generic message `"conflicts detected: 1"` — the user gets no hint that the path is the problem.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-126 ./internal/installer/...`
+**How we know test is correct**: when a user supplies a target that cannot exist, the error must point at the path, not at a phantom conflict; otherwise debugging is impossible.
+
+## BUG-127 — install rejects directory-as-target without deleting it
+**Status**: passing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/symlink_edges_test.go:TestSymlink_Edges/BUG-127-TargetIsDirectory
+**Spec source**: `.omo/plans/better-tests.md` line 1585; `AGENTS.md` CONFLICT SEMANTICS ("Exists, not a symlink (file or dir) → conflict")
+**Expected**: install errors with a conflict when the target is a real directory; the directory and any files inside it remain untouched after the failed install.
+**Actual**: matches expected — DetectConflicts surfaces the directory as a conflict and ExecuteInstallPlan aborts before any FS mutation; `assert.DirExists` and the precious-file content check both pass.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-127 ./internal/installer/...`
+**How we know test is correct**: silent directory deletion would be the single most catastrophic regression possible in a dotfile manager; pinning the "do not delete" invariant by reading the precious file's bytes after the failed install is the strongest possible guard.
+
+## BUG-128 — ReadLink errors clearly on a non-symlink
+**Status**: passing
+**Severity**: S3
+**Package**: internal/symlink
+**Test**: internal/symlink/edges_test.go:TestSymlink_Edges/BUG-128-ReadLinkNonSymlink
+**Spec source**: `.omo/plans/better-tests.md` line 1586; `internal/symlink/AGENTS.md` API contract
+**Expected**: `ReadLink(regularFile)` returns a non-nil error with a clear message and an empty string.
+**Actual**: matches expected — `ReadLink` wraps `os.Readlink`, which surfaces the underlying syscall error.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-128 ./internal/symlink/...`
+**How we know test is correct**: callers rely on the error to decide whether the entry is a symlink at all; an empty/silent return would mask the real failure.
+
+## BUG-129 — IsSymlinkTo returns true for broken symlink whose stored target matches
+**Status**: passing
+**Severity**: S2
+**Package**: internal/symlink
+**Test**: internal/symlink/edges_test.go:TestSymlink_Edges/BUG-129-IsSymlinkToBrokenSymlink
+**Spec source**: `.omo/plans/better-tests.md` line 1587; first-principles "function answers literal question"
+**Expected**: `IsSymlinkTo(brokenLink, storedTarget)` returns `(true, nil)` — it answers "is this a symlink pointing to that path", not "is the pointee reachable". Implementation MUST use `os.Readlink`, not `os.Stat`.
+**Actual**: matches expected — `IsSymlinkTo` uses `os.Lstat` + `os.Readlink` and never follows the link.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-129 ./internal/symlink/...`
+**How we know test is correct**: the installer's idempotency check relies on this — if it returned false for valid but dangling links, every re-install would (incorrectly) attempt to re-create them.
+
+## BUG-130 — concurrent Create/Remove on same target leaves a deterministic final state
+**Status**: passing
+**Severity**: S2
+**Package**: internal/symlink
+**Test**: internal/symlink/edges_test.go:TestSymlink_Edges/BUG-130-ConcurrentCreateRemove
+**Spec source**: `.omo/plans/better-tests.md` line 1588
+**Expected**: spawning N goroutines racing `CreateSymlink` vs `RemoveSymlink` on one target produces a final state that is either absent OR a symlink to exactly the expected source. No torn intermediate state (regular file, half-written link, link to garbage).
+**Actual**: matches expected — both wrappers rely on atomic `os.Symlink`/`os.Remove` syscalls; intermediate states are impossible at the syscall layer, and the test runs cleanly under `-race`.
+**Repro**: `go test -race -run TestSymlink_Edges/BUG-130 ./internal/symlink/...`
+**How we know test is correct**: any non-deterministic torn state would be caught by the final `os.Lstat`+`os.Readlink` invariant check; the race detector additionally guards against unsynchronized writes inside the wrappers.

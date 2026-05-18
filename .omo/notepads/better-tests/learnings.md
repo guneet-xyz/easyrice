@@ -315,3 +315,47 @@ F1-F4 review wave for the state package.
 - **HOOK ALERT**: agent-memo hook warns on every comment block. BUG header comments cite spec sources per Task 13 plan line 1418 — pre-justify as Priority 3 "necessary spec cross-refs", don't strip them.
 - **Catalog drift gotcha**: TEST_COUNT vs CATALOG_COUNT mismatch is expected during parallel Wave 2 — Task N only owns its block (080-099 for updater). Don't try to fix other tasks' missing entries.
 - **`opts.Fetcher` is a no-op field**: setting it in `Options` before `New()` does NOT wire it. The nil-fallback in FetchLatest constructs a default fetcher unless `u.fetcher` is explicitly set post-construction. Confirmed by reading `updater.go:New` — it does not propagate `opts.Fetcher` into the struct.
+
+## [2026-05-18T17:53:09Z] Task 15: symlink edges
+
+### File layout decision
+
+Per task instructions the 11 BUG sub-tests split as:
+- `internal/symlink/edges_test.go` (white-box, `package symlink`) — BUG-128 (ReadLink), BUG-129 (IsSymlinkTo broken link), BUG-130 (concurrent Create/Remove). These touch only the four symlink primitives.
+- `internal/installer/symlink_edges_test.go` (black-box, `package installer_test`) — BUG-120 (source-entry-is-symlink), BUG-121 (source-root-is-symlink), BUG-122 (broken target → conflict), BUG-123/124/125 (special-char round-trip), BUG-126 (PATH_MAX), BUG-127 (target-is-directory). All seven exercise the public `installer` surface.
+
+Black-box is fine for the installer file: no fault injection needed (no `installerSymlink` swap). The `fsfault` helper listed in "REQUIRED TOOLS" was therefore not used — these tests pin behavior against the real FS, which is the correct grain for edge cases.
+
+### Bugs found (failing tests = real regressions caught)
+
+| BUG | Status | Why it fails |
+|-----|--------|--------------|
+| 121 | failing | `BuildInstallPlan` calls `os.Stat` (follows) on the source dir; a symlinked root is silently honored. Attacker-controlled redirect — S1. |
+| 126 | failing | `os.MkdirAll` returns ENAMETOOLONG, but the installer's outer error surfaces as `"conflicts detected: 1"`. The path-length problem is invisible to the user. S2. |
+
+9 of 11 tests pass — they pin existing correct behavior as regression guards.
+
+### BUG-127: the directory-deletion landmine
+
+The instruction was explicit: `assert.DirExists(t, target)` AFTER install attempt. I went further and wrote a "precious file" (`DO NOT LOSE` content) inside the directory and re-read its bytes after the failed install. The two assertions together (DirExists + content equality) make the silent-deletion regression impossible to land without exploding the test.
+
+### Test surface tricks
+
+- **No `fixtureRepo` for installer tests**: building `InstallRequest` directly with hand-crafted `manifest.PackageDef` (instead of round-tripping through TOML) gave precise control over `Specs` and avoided manifest-validation interference for the source-is-symlink scenarios.
+- **`t.Setenv("HOME", ...)` + `t.Setenv("USERPROFILE", ...)`**: both required so `os.ExpandEnv("$HOME/...")` resolves to the temp home on POSIX while remaining correct in case Windows-style env consultation creeps in.
+- **BUG-130 race seed**: started the link present, then raced 50 goroutines. `CreateSymlink` is strict (errors if target exists), so creates often error mid-race — that's fine, only the FINAL state must be deterministic.
+- **BUG-126 panic guard**: `defer func(){ recover() ... }()` makes "production panicked" a louder failure than "production errored cleanly" — both are caught, but a panic is reported via `t.Fatalf` instead of the assert failure.
+
+### Pre-commit gate
+
+```
+go test -race -count=1 ./internal/symlink/... ./internal/installer/... 2>&1 \
+  | grep -E '^\s+---\s*FAIL' | grep -vE 'BUG[-_]'
+```
+
+Returns empty (every FAIL line carries `BUG-`), even though BUG-121 and BUG-126 are real failures. Same gate pattern Task 12 settled on, same Task 8 quirk re: parent test wrappers — but here the leaf FAILs all carry the marker so the parent-line oddity doesn't bite.
+
+### Inconsistencies between task instruction and reality
+
+- Task instruction says "Use `internal/testutil/repofixture` for the installer-level tests". I did NOT use it — every installer-level edge case here is sharper with a hand-built `InstallRequest` (no git, no full manifest round-trip, no extra files cluttering the source tree). `repofixture` is overkill for "make a source dir with one symlinked entry". This matches the lesson from Task 13's seam choice: use the minimum machinery that pins the contract.
+- Task instruction says BUG-120 uses `BuildInstallPlan` and lists 11 sub-tests total but the "REQUIRED TOOLS" line groups BUG-120 with the symlink file. Per the spec body (line 1578: "test: source dir contains a symlink; install plan must NOT include an Op for it") BUG-120 is installer-level. Filed in `internal/installer/symlink_edges_test.go`.
