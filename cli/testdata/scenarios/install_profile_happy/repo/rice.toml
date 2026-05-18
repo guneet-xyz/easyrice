@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal emulator"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/ghostty"}]

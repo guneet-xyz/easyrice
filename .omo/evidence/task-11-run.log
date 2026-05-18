@@ -1,0 +1,6 @@
+=== RUN   TestScenario_InstallProfileHappy
+=== RUN   TestScenario_InstallProfileHappy/install_ghostty_common_profile
+--- PASS: TestScenario_InstallProfileHappy (0.00s)
+    --- PASS: TestScenario_InstallProfileHappy/install_ghostty_common_profile (0.00s)
+PASS
+ok  	github.com/guneet-xyz/easyrice/cli	1.015s

@@ -1,0 +1,12 @@
+.config [dir]
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/ghostty [dir]
+.config/easyrice/repos/default/ghostty/common [dir]
+.config/easyrice/repos/default/ghostty/common/config [file]
+.config/easyrice/repos/default/rice.toml [file]
+.config/ghostty [dir]
+.config/ghostty/config -> <REPO>/ghostty/common/config

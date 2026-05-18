@@ -171,11 +171,28 @@ func captureStateSnapshot(statePath string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to unmarshal state: %w", err)
 	}
 
-	// Re-marshal with sorted keys and 2-space indent
-	normalized, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
+	// Normalize volatile fields: replace per-package "installed_at" timestamps with a
+	// stable placeholder so snapshots are comparable across runs.
+	for _, v := range state {
+		pkg, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if _, present := pkg["installed_at"]; present {
+			pkg["installed_at"] = "<IGNORE>"
+		}
+	}
+
+	// Re-marshal with sorted keys and 2-space indent. Disable HTML escaping so
+	// placeholder tokens like <IGNORE> survive the round-trip verbatim.
+	var out bytes.Buffer
+	enc := json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(state); err != nil {
 		return nil, fmt.Errorf("failed to marshal state: %w", err)
 	}
+	normalized := bytes.TrimRight(out.Bytes(), "\n")
 
 	return normalized, nil
 }

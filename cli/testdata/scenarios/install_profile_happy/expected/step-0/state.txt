@@ -1,0 +1,12 @@
+{
+  "ghostty": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/ghostty/common/config",
+        "target": "<HOME>/.config/ghostty/config"
+      }
+    ],
+    "profile": "common"
+  }
+}
