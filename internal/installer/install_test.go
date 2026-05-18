@@ -19,10 +19,58 @@ import (
 
 func fixtureRepo(t *testing.T) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "testdata", "install_v2")
 	dst := t.TempDir()
-	require.NoError(t, copyDir(src, dst))
+	const manifest = `schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal emulator configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.common]
+sources = [
+  {path = "common",      mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "common-only", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.ghostty.profiles.macbook]
+sources = [
+  {path = "common", mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "macbook", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+root = "nvim-custom"
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+
+[packages.folder-overlay-pkg]
+description = "Package with two folder-mode sources targeting same path (invalid)"
+supported_os = ["linux", "darwin"]
+
+[packages.folder-overlay-pkg.profiles.common]
+sources = [
+  {path = "cfg1", mode = "folder", target = "$HOME/.config/myfolder"},
+  {path = "cfg2", mode = "folder", target = "$HOME/.config/myfolder"},
+]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dst, "rice.toml"), []byte(manifest), 0o644))
+	writeFixtureFile(t, dst, "ghostty/common/config", "# Ghostty configuration - common profile\nbackend = \"kitty\"\nfont-size = 12\n")
+	writeFixtureFile(t, dst, "ghostty/common-only/settings", "common only file\n")
+	writeFixtureFile(t, dst, "ghostty/macbook/extra", "# Ghostty configuration - macbook profile\nmacos-option-as-alt = true\n")
+	writeFixtureFile(t, dst, "nvim-custom/config/init.vim", "# Neovim configuration\nset number\nset expandtab\n")
+	writeFixtureFile(t, dst, "folder-overlay-pkg/cfg1/a.txt", "file1\n")
+	writeFixtureFile(t, dst, "folder-overlay-pkg/cfg2/b.txt", "file2\n")
 	return dst
+}
+
+func writeFixtureFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	full := filepath.Join(root, rel)
+	require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+	require.NoError(t, os.WriteFile(full, []byte(content), 0o644))
 }
 
 func copyDir(src, dst string) error {
