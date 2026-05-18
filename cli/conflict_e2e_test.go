@@ -9,7 +9,37 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
+
+func TestScenario_ConflictPreexistingFile(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "conflict_preexisting_file"))
+	require.NoError(t, err)
+
+	sb := setupScenarioSandbox(t)
+	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
+
+	scenarioDir := renderScenario(t, srcDir, sb)
+	scenario.Run(t, scenarioDir, newScenarioConfig())
+}
+
+func TestScenario_ConflictTwoPackagesSameTarget(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "conflict_two_packages_same_target"))
+	require.NoError(t, err)
+
+	sb := setupScenarioSandbox(t)
+	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
+
+	scenarioDir := renderScenario(t, srcDir, sb)
+	scenario.Run(t, scenarioDir, newScenarioConfig())
+}
 
 // demoManifestFileMode is a minimal file-mode manifest with a single source file.
 const demoManifestFileMode = `schema_version = 1
@@ -45,36 +75,11 @@ func writeDemoFolderMode(t *testing.T, repoRoot string) {
 	writeSourceFile(t, repoRoot, "demo/src/dotfile", "source-content\n")
 }
 
-// TestE2E_Conflict_PreExistingRealFile_AbortsWithoutYes: a real file at the
-// planned target causes install to abort; the file's contents are preserved
-// and state remains untouched.
-func TestE2E_Conflict_PreExistingRealFile_AbortsWithoutYes(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeDemoFileMode(t, repoRoot)
-
-	tgt := filepath.Join(homeDir, ".config", "demo", "dotfile")
-	require.NoError(t, os.MkdirAll(filepath.Dir(tgt), 0o755))
-	require.NoError(t, os.WriteFile(tgt, []byte("user-data"), 0o644))
-
-	out, err := runE2ECmd(t, "install", "demo", "--profile", "default", "--state", statePath)
-	require.Error(t, err, "expected conflict error")
-	assert.Contains(t, out, "CONFLICT")
-
-	data, readErr := os.ReadFile(tgt)
-	require.NoError(t, readErr)
-	assert.Equal(t, "user-data", string(data))
-
-	assertStateMissingPackage(t, statePath, "demo")
-}
-
 // TestE2E_Conflict_PreExistingRealFile_OverwritesWithYes: the production code
 // does NOT overwrite real files even when `--yes` is supplied; pre-flight
 // conflict detection still aborts. The pre-existing file is preserved.
+// INLINE: tight single-step assertion on --yes preservation semantics; no
+// scenario migration warranted.
 func TestE2E_Conflict_PreExistingRealFile_OverwritesWithYes(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -305,50 +310,6 @@ func TestE2E_Conflict_FolderModeTargetHasFiles_AbortsWithoutYes(t *testing.T) {
 	assert.Equal(t, "important", string(data), "user files inside dir preserved")
 
 	assertStateMissingPackage(t, statePath, "demo")
-}
-
-// TestE2E_Conflict_TwoPackagesSameTarget: installing pkgA and then attempting
-// to install pkgB which targets the same path aborts pkgB and leaves pkgA's
-// symlink intact in state and on disk.
-func TestE2E_Conflict_TwoPackagesSameTarget(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeManifest(t, repoRoot, `schema_version = 1
-
-[packages.pkga]
-supported_os = ["linux", "darwin"]
-[packages.pkga.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/shared"}]
-
-[packages.pkgb]
-supported_os = ["linux", "darwin"]
-[packages.pkgb.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/shared"}]
-`)
-	writeSourceFile(t, repoRoot, "pkga/src/file", "from-a\n")
-	writeSourceFile(t, repoRoot, "pkgb/src/file", "from-b\n")
-
-	outA, errA := runE2ECmd(t, "install", "pkga", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, errA, "pkga install: %s", outA)
-
-	tgt := filepath.Join(homeDir, ".config", "shared", "file")
-	srcA, absErr := filepath.Abs(filepath.Join(repoRoot, "pkga", "src", "file"))
-	require.NoError(t, absErr)
-	assertSymlinkPointsTo(t, tgt, srcA)
-
-	outB, errB := runE2ECmd(t, "install", "pkgb", "--profile", "default", "--state", statePath)
-	require.Error(t, errB, "pkgb must conflict with pkga's symlink")
-	assert.Contains(t, outB, "CONFLICT")
-
-	// pkga's symlink still points where it did
-	assertSymlinkPointsTo(t, tgt, srcA)
-
-	assertStateHasPackage(t, statePath, "pkga", "default", 1)
-	assertStateMissingPackage(t, statePath, "pkgb")
 }
 
 // TestE2E_Conflict_NoConflictWhenAlreadyOurs: installing the same package

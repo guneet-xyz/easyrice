@@ -1,0 +1,12 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/remotes/upstream/base/common/basefile",
+        "target": "<HOME>/.config/base/basefile"
+      }
+    ],
+    "profile": "default"
+  }
+}

@@ -40,13 +40,20 @@ func copyTree(t *testing.T, src, dst string) {
 	}))
 }
 
-func TestScenario_InstallProfileHappy(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
+// scenarioSandbox is the per-test sandbox for scenario-driven tests.
+type scenarioSandbox struct {
+	HomeDir   string
+	RepoRoot  string
+	StateFile string
+}
 
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_profile_happy"))
-	require.NoError(t, err)
-
+// setupScenarioSandbox creates an isolated $HOME, ensures the managed repo
+// root exists, and returns paths a scenario can render its steps.yaml against.
+// It does NOT copy the scenario's repo/ seed - callers do that themselves so
+// they can interleave Go-side preludes (e.g. git submodule setup) between
+// seeding and rendering.
+func setupScenarioSandbox(t *testing.T) scenarioSandbox {
+	t.Helper()
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
@@ -55,10 +62,17 @@ func TestScenario_InstallProfileHappy(t *testing.T) {
 
 	repoRoot := repo.DefaultRepoPath()
 	require.NoError(t, os.MkdirAll(repoRoot, 0o755))
-	copyTree(t, filepath.Join(srcDir, "repo"), repoRoot)
 
 	stateFile := filepath.Join(t.TempDir(), "state.json")
+	return scenarioSandbox{HomeDir: homeDir, RepoRoot: repoRoot, StateFile: stateFile}
+}
 
+// renderScenario copies the scenario at srcDir into a fresh temp dir,
+// substitutes __HOME__/__REPO__/__STATE__ placeholders in steps.yaml using
+// the sandbox values, and returns the rendered scenario dir ready for
+// scenario.Run.
+func renderScenario(t *testing.T, srcDir string, sb scenarioSandbox) string {
+	t.Helper()
 	scenarioDir := t.TempDir()
 	copyTree(t, srcDir, scenarioDir)
 
@@ -66,11 +80,24 @@ func TestScenario_InstallProfileHappy(t *testing.T) {
 	raw, err := os.ReadFile(stepsPath)
 	require.NoError(t, err)
 	rendered := strings.NewReplacer(
-		"__HOME__", homeDir,
-		"__REPO__", repoRoot,
-		"__STATE__", stateFile,
+		"__HOME__", sb.HomeDir,
+		"__REPO__", sb.RepoRoot,
+		"__STATE__", sb.StateFile,
 	).Replace(string(raw))
 	require.NoError(t, os.WriteFile(stepsPath, []byte(rendered), 0o644))
+	return scenarioDir
+}
 
+func TestScenario_InstallProfileHappy(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_profile_happy"))
+	require.NoError(t, err)
+
+	sb := setupScenarioSandbox(t)
+	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
+
+	scenarioDir := renderScenario(t, srcDir, sb)
 	scenario.Run(t, scenarioDir, newScenarioConfig())
 }

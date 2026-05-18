@@ -1,0 +1,12 @@
+{
+  "pkga": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/pkga/src/file",
+        "target": "<HOME>/.config/shared/file"
+      }
+    ],
+    "profile": "default"
+  }
+}

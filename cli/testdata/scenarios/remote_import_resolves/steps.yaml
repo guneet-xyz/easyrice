@@ -1,0 +1,18 @@
+steps:
+  - name: "install demo importing base.common from submodule"
+    args:
+      - "--state"
+      - "__STATE__"
+      - "--yes"
+      - "install"
+      - "demo"
+      - "--profile"
+      - "default"
+      - "--skip-deps"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      state: "expected/step-0/state.txt"

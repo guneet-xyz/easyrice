@@ -1,0 +1,13 @@
+schema_version = 1
+
+[packages.pkga]
+supported_os = ["linux", "darwin"]
+
+[packages.pkga.profiles.default]
+sources = [{path = "src", mode = "file", target = "$HOME/.config/shared"}]
+
+[packages.pkgb]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgb.profiles.default]
+sources = [{path = "src", mode = "file", target = "$HOME/.config/shared"}]

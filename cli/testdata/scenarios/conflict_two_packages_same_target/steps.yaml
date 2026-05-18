@@ -1,0 +1,22 @@
+steps:
+  - name: "install pkga succeeds"
+    args: ["install", "pkga", "--profile", "default", "--state", "__STATE__", "--yes"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      state: "expected/step-0/state.txt"
+
+  - name: "install pkgb at same target conflicts with pkga symlink"
+    args: ["install", "pkgb", "--profile", "default", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "CONFLICT"
+      state: "expected/step-1/state.txt"

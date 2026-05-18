@@ -1,0 +1,20 @@
+steps:
+  - name: "install demo with preexisting real file aborts"
+    args: ["install", "demo", "--profile", "default", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    mutate:
+      - op: mkdir
+        path: <HOME>/.config/demo
+        mode: "0755"
+      - op: write_file
+        path: <HOME>/.config/demo/dotfile
+        content: "user-data"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "CONFLICT"
+        - "existing file"
+      state: "expected/step-0/state.txt"
