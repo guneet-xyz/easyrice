@@ -1,0 +1,14 @@
+.config [dir]
+.config/demo [dir]
+.config/demo/file1 -> <REPO>/demo/default/file1
+.config/demo/file2 -> <REPO>/demo/default/file2
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/demo [dir]
+.config/easyrice/repos/default/demo/default [dir]
+.config/easyrice/repos/default/demo/default/file1 [file]
+.config/easyrice/repos/default/demo/default/file2 [file]
+.config/easyrice/repos/default/rice.toml [file]

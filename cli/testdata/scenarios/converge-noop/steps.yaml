@@ -1,0 +1,25 @@
+steps:
+  - name: "install demo first time"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Installed demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+  - name: "install demo again (no-op)"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "is already up to date"
+      home: "expected/step-1/home.txt"
+      state: "expected/step-1/state.txt"

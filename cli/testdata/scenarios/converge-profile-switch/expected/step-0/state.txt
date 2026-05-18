@@ -1,0 +1,12 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/demo/common/file-common",
+        "target": "<HOME>/.config/demo/file-common"
+      }
+    ],
+    "profile": "common"
+  }
+}

@@ -1,0 +1,36 @@
+steps:
+  - name: "install demo"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Installed demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+  - name: "break symlink"
+    args: ["version"]
+    mutate:
+      - op: remove
+        path: "<HOME>/.config/demo/file1"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+  - name: "repair demo"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Repaired demo"
+      home: "expected/step-2/home.txt"
+      state: "expected/step-2/state.txt"
