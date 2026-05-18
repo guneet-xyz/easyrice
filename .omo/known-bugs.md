@@ -232,160 +232,148 @@ Every entry follows this exact template. Copy it verbatim when adding a new entr
 **Repro**: No test exists; this entry is illustrative only.
 **How we know test is correct**: N/A, this row is a format demonstration and is deleted once real entries land.
 
-## BUG-066 — Partial install rollback durability
+## BUG-080 — ErrDevBuild short-circuits CheckCached
 **Status**: passing
 **Severity**: S2
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-066-PartialRollback
-**Spec source**: `.omo/plans/better-tests.md` line 1303 (Task 12)
-**Expected**: When symlink op 5 fails, state.json records exactly the 4 successful links and exactly 4 symlinks exist on disk; no 5th+ link.
-**Actual**: `ExecuteInstallPlan`'s `saveAndReturn` already persists the partial `created` list before propagating the error — verified by this regression test.
-**Repro**: `go test -race -count=3 -run TestInstaller_Edges/BUG-066-PartialRollback ./internal/installer/...`
-**How we know test is correct**: `fsfault.WithSymlink_FailAfterN(t, &installerSymlink, 4)` deterministically succeeds 4 times then errors; state load asserts `len(InstalledLinks)==4` and `filepath.WalkDir` counts exactly 4 symlinks under HOME.
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_080_DevBuild
+**Spec source**: `internal/updater/cache.go:88-95`, `internal/updater/errors.go:6` (`ErrDevBuild`), `internal/updater/AGENTS.md` ("dev builds short-circuit")
+**Expected**: `CheckCached("dev")` returns `UpdateAvailable=false` without invoking the fetcher and without writing to the cache.
+**Actual**: Behaves as expected; mocked fetcher records 0 calls and cache file is absent.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_080' ./internal/updater/...`
+**How we know test is correct**: Mocked fetcher counts invocations; cache file path is asserted absent via `os.Stat`.
 
-## BUG-067 — withinHome bypass: absolute /etc/passwd target rejected
+## BUG-081 — ErrAlreadyLatest when fetcher reports same semver
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_081_AlreadyLatest
+**Spec source**: `internal/updater/errors.go:7` (`ErrAlreadyLatest`), `internal/updater/fetch.go:60-67`, `internal/updater/version.go:35-48`
+**Expected**: Fetcher returning the same semver as current produces `UpdateAvailable=false`; the sentinel itself propagates verbatim through `FetchLatest`.
+**Actual**: Behaves as expected.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_081' ./internal/updater/...`
+**How we know test is correct**: Two complementary assertions — `CheckCached` integration path and direct `FetchLatest` sentinel propagation — cover both surfaces.
+
+## BUG-082 — ErrLockBusy prevents binary mutation
 **Status**: passing
 **Severity**: S1
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-067-TargetOutsideHome
-**Spec source**: `.omo/plans/better-tests.md` line 1304 (Task 12); AGENTS.md "withinHome"
-**Expected**: `BuildInstallPlan` rejects `target="/etc/passwd"` before any FS op.
-**Actual**: `withinHome` returns false; error message includes "escapes home directory" — the test accepts either "outside" or "escapes home" wording.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-067 ./internal/installer/...`
-**How we know test is correct**: Asserts both an error AND that the message names the boundary violation.
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_082_LockBusy
+**Spec source**: `internal/updater/errors.go:8` (`ErrLockBusy`), `internal/updater/lock.go:35-51`, `internal/updater/swap.go:36-39`
+**Expected**: When `upgrade.lock` exists fresh, `Apply` returns `ErrLockBusy` and never calls the swapper.
+**Actual**: Behaves as expected.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_082' ./internal/updater/...`
+**How we know test is correct**: `mockedSwapper.calls` is asserted == 0 AND a sentinel marker file in the cache dir is verified unchanged.
 
-## BUG-068 — withinHome with symlinked $HOME
+## BUG-083 — ErrNoChecksum surfaces from FetchLatest
 **Status**: passing
 **Severity**: S1
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-068-SymlinkedHomeBoundary
-**Spec source**: `.omo/plans/better-tests.md` line 1305 (Task 12)
-**Expected**: Target traversing `..` through a symlinked HOME is rejected.
-**Actual**: `filepath.Rel(absHome, absTarget)` returns a `..`-prefixed path, so withinHome rejects.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-068 ./internal/installer/...`
-**How we know test is correct**: Sets up real/fake home with `os.Symlink`, points the spec target through `fakeHome/../escape`, asserts `BuildInstallPlan` errors.
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_083_NoChecksum
+**Spec source**: `internal/updater/errors.go:9` (`ErrNoChecksum`), `internal/updater/fetch.go:69-72`, `internal/updater/AGENTS.md` (fail-closed checksum gate)
+**Expected**: Releases without a checksums.txt asset are rejected with `ErrNoChecksum`.
+**Actual**: Behaves as expected; mocked fetcher returning the sentinel is passed through verbatim.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_083' ./internal/updater/...`
+**How we know test is correct**: `errors.Is(err, ErrNoChecksum)` is the canonical CLI match path.
 
-## BUG-069 — withinHome with ".." in target
+## BUG-084 — ErrCacheCorrupt detected and recovered
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_084_CacheCorrupt
+**Spec source**: `internal/updater/cache.go:30-48`, `internal/updater/cache.go:97-103`, `internal/updater/errors.go:10`
+**Expected**: Invalid JSON in `update-check.json` produces `ErrCacheCorrupt` from `loadCache`; `CheckCached` swallows the sentinel and re-seeds a fresh cache.
+**Actual**: Behaves as expected; cache is re-seeded with current version after corrupt detection.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_084' ./internal/updater/...`
+**How we know test is correct**: Two-step assertion — direct `loadCache` sentinel match, then `CheckCached` no-error path with re-seeded cache verified by a second `loadCache`.
+
+## BUG-085 — ErrInvalidSemver wraps non-semver tags
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_085_InvalidSemver
+**Spec source**: `internal/updater/errors.go:11` (`ErrInvalidSemver`), `internal/updater/version.go:35-48`
+**Expected**: `IsNewer` returns a wrapped `ErrInvalidSemver` when either argument fails `semver.IsValid` after normalization.
+**Actual**: Behaves as expected for both invalid-latest and invalid-current inputs.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_085' ./internal/updater/...`
+**How we know test is correct**: Both directions (invalid latest, invalid current) are independently asserted via `errors.Is`.
+
+## BUG-086 — Pre-release tags rejected
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_086_PreReleaseRejected
+**Spec source**: `internal/updater/version.go:50-55`, `internal/updater/AGENTS.md` ("rejects pre-releases")
+**Expected**: `IsPreRelease` classifies `vX.Y.Z-beta.N` and `vX.Y.Z-rc.N` as pre-releases; bare `vX.Y.Z` is NOT a pre-release.
+**Actual**: Behaves as expected.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_086' ./internal/updater/...`
+**How we know test is correct**: Both rejecting (beta, rc) and accepting (stable) inputs are asserted, preventing false positives.
+
+## BUG-087 — Network failure is fail-silent
+**Status**: passing
+**Severity**: S2
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_087_NetworkFailureFailSilent
+**Spec source**: `internal/updater/cache.go:137-145`, `internal/updater/AGENTS.md` ("CheckCached: fail-silent network")
+**Expected**: A fetcher error (e.g. `connection refused`) does NOT bubble out of `CheckCached`; the result is `UpdateAvailable=false`.
+**Actual**: Behaves as expected; `nil` error returned and `UpdateAvailable=false`.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_087' ./internal/updater/...`
+**How we know test is correct**: Mocked fetcher injects a vanilla network error and `require.NoError` proves the swallow contract.
+
+## BUG-088 — Atomic swap rollback on mid-flight failure
 **Status**: passing
 **Severity**: S1
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-069-DotDotInTarget
-**Spec source**: `.omo/plans/better-tests.md` line 1306 (Task 12)
-**Expected**: `target="$HOME/../etc"` rejected after expansion + cleaning.
-**Actual**: `withinHome` applies `filepath.Abs` then `filepath.Rel`; result begins with `..`, rejected.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-069 ./internal/installer/...`
-**How we know test is correct**: Asserts an error on `$HOME/../etc` after `os.ExpandEnv`.
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_088_AtomicSwapRollback
+**Spec source**: `internal/updater/swap.go:54-58`, `internal/updater/AGENTS.md` ("Atomic binary swap; never re-execs")
+**Expected**: If the swapper fails mid-way, `Apply` propagates a wrapped error, the running binary stays in pre-swap state, and the lockfile is released.
+**Actual**: Behaves as expected; the sentinel binary file is unchanged and the lockfile is gone.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_088' ./internal/updater/...`
+**How we know test is correct**: Triple assertion — error contains underlying message, binary file bytes unchanged via `os.ReadFile`, lockfile path absent via `os.Stat`.
 
-## BUG-070 — file+folder mode collision on overlapping subtree
-**Status**: passing
-**Severity**: S2
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-070-FileFolderCollision
-**Spec source**: `.omo/plans/better-tests.md` line 1307 (Task 12); AGENTS.md "Source modes"
-**Expected**: BuildInstallPlan rejects when a folder-mode source and another source share a target subtree.
-**Actual**: The overlay validation loop in `install.go` emits "sources … both target overlapping paths …".
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-070 ./internal/installer/...`
-**How we know test is correct**: Two sources on the same target; one folder, one file → asserts error containing "overlap" or "folder".
-
-## BUG-071 — File-mode overlay last-wins
-**Status**: passing
-**Severity**: S2
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-071-OverlayLastWins
-**Spec source**: `.omo/plans/better-tests.md` line 1308 (Task 12); AGENTS.md "Source modes"
-**Expected**: With sources A, B, C all writing the same target relative path, the resulting symlink points into source C.
-**Actual**: `indexByTarget` overwrite preserves the C source's absolute path.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-071 ./internal/installer/...`
-**How we know test is correct**: After install, `os.Readlink` is read directly and compared to the expected absolute path under source C; goldenfs `Snapshot` confirms the overlay link exists under HOME.
-
-## BUG-072 — Folder-mode is NOT overlayable
-**Status**: passing
-**Severity**: S2
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-072-FolderModeDoubleTarget
-**Spec source**: `.omo/plans/better-tests.md` line 1309 (Task 12)
-**Expected**: Two folder-mode sources pointing at the same target → rejected at plan time.
-**Actual**: Folder overlay validation in `install.go` flags the collision.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-072 ./internal/installer/...`
-**How we know test is correct**: Builds a fixture with two folder sources sharing one target; asserts `BuildInstallPlan` errors.
-
-## BUG-073 — Idempotency: ConvergeAll twice preserves installed_at
-**Status**: passing
-**Severity**: S2
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-073-Idempotent
-**Spec source**: `.omo/plans/better-tests.md` line 1310 (Task 12)
-**Expected**: Second ConvergeAll is a no-op; `installed_at` byte-equal to first run.
-**Actual**: When the package is already converged, `BuildConvergePlan` returns `OutcomeNoOp` and `ExecuteConvergePlan` returns early without re-stamping state.
-**Repro**: `go test -race -count=3 -run TestInstaller_Edges/BUG-073 ./internal/installer/...`
-**How we know test is correct**: Reads state.json before and after the second converge and compares `InstalledAt` with `require.Equal`.
-
-## BUG-074 — Profile-switch must preserve installed_at
-**Status**: failing
-**Severity**: S3
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-074-ProfileSwitchPreservesInstalledAt
-**Spec source**: `.omo/plans/better-tests.md` line 1311 (Task 12)
-**Expected**: After switching profile A → B, `installed_at` equals the initial install timestamp.
-**Actual**: `ExecuteInstallPlan` unconditionally writes `InstalledAt: time.Now()`, so profile switch advances the timestamp.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-074 ./internal/installer/...`
-**How we know test is correct**: Loads state immediately after first install (capturing `beforeAt`), executes profile-switch converge, reloads state, asserts `require.Equal(beforeAt, after.InstalledAt)`.
-
-## BUG-075 — Repair must preserve installed_at
-**Status**: failing
-**Severity**: S3
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-075-RepairPreservesInstalledAt
-**Spec source**: `.omo/plans/better-tests.md` line 1312 (Task 12)
-**Expected**: Repair re-creates a missing symlink without modifying `installed_at`.
-**Actual**: `OutcomeRepaired` flows through `Install` which writes `time.Now()`.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-075 ./internal/installer/...`
-**How we know test is correct**: Removes one symlink, converges again, compares stored `InstalledAt` against the value captured before drift.
-
-## BUG-076 — Uninstall of not-installed package
+## BUG-089 — CleanupOrphanArtifacts removes .new/.old siblings
 **Status**: passing
 **Severity**: S3
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-076-UninstallNotInstalled
-**Spec source**: `.omo/plans/better-tests.md` line 1313 (Task 12)
-**Expected**: Error `package %q not installed`; non-zero exit (mapped from error).
-**Actual**: `BuildUninstallPlan` returns the canonical error string.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-076 ./internal/installer/...`
-**How we know test is correct**: Calls `Uninstall` with an empty state path; asserts the error contains "not installed".
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_089_CleanupOrphanArtifacts
+**Spec source**: `internal/updater/cleanup.go:14-40`, `internal/updater/AGENTS.md` ("Removes .new/.old siblings")
+**Expected**: `.new` removed on all OSes; `.old` removed only on non-Windows. Idempotent. Never touches the real binary.
+**Actual**: Behaves as expected.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_089' ./internal/updater/...`
+**How we know test is correct**: Per-OS branch via `runtime.GOOS`, second invocation asserts idempotency, real binary bytes asserted unchanged.
 
-## BUG-077 — Install with non-existent profile lists available
-**Status**: passing
-**Severity**: S3
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-077-UnknownProfile
-**Spec source**: `.omo/plans/better-tests.md` line 1314 (Task 12)
-**Expected**: Error names the unknown profile and at least one available profile.
-**Actual**: Currently the failure path in `BuildConvergePlan` flows through `profile.ResolveSpecs` which surfaces the unknown profile name; the available profile leaks through via the wrap when no stored profile exists.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-077 ./internal/installer/...`
-**How we know test is correct**: Asserts error AND that the message names a known profile ("default").
-
-## BUG-078 — Install of undeclared package
-**Status**: passing
-**Severity**: S3
-**Package**: internal/installer
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-078-UndeclaredPackage
-**Spec source**: `.omo/plans/better-tests.md` line 1315 (Task 12)
-**Expected**: Error references the undeclared package; CLI maps this to a hint about `rice status`.
-**Actual**: At the installer layer, a nil `Pkg` returns "install request: Pkg must not be nil for package …" which is the lower-half of the discovery path used by CLI.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-078 ./internal/installer/...`
-**How we know test is correct**: Asserts `BuildConvergePlan` errors and the message is non-empty (CLI is the layer that adds the `rice status` hint; the installer layer is covered here).
-
-## BUG-079 — Empty `[packages.x.profiles]` rejected by manifest validation
+## BUG-090 — 24h TTL boundary is exact
 **Status**: passing
 **Severity**: S2
-**Package**: internal/manifest
-**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-079-EmptyProfilesRejected
-**Spec source**: `.omo/plans/better-tests.md` line 1316 (Task 12); cross-ref BUG-026
-**Expected**: `Validate` rejects a package whose `profiles` map is empty.
-**Actual**: `validate.go` emits `"package %q: at least one profile must be defined"`.
-**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-079 ./internal/installer/...`
-**How we know test is correct**: Constructs a `*Manifest` with one package and zero profiles; asserts `Validate` returns an error mentioning "profile".
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_090_TTLBoundary
+**Spec source**: `internal/updater/cache.go:19` (`cacheTTL = 24h`), `internal/updater/cache.go:122-135` (`now.Sub(c.LastChecked) > cacheTTL`)
+**Expected**: At T=23h59m the cache is fresh (no fetch); at T=24h01m it is stale (fetch happens exactly once).
+**Actual**: Behaves as expected via a `mockedClock` advancing through the boundary.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_090' ./internal/updater/...`
+**How we know test is correct**: Same `*Updater` instance is reused across both boundary checks so fetcher-call-count accumulates deterministically.
 
+## BUG-091 — FormatReminder contains version + URL
+**Status**: passing
+**Severity**: S3
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_091_FormatReminder
+**Spec source**: `internal/updater/reminder.go:10-17`
+**Expected**: Reminder output is exactly 2 lines and contains current version, latest version, and the canonical `https://github.com/<owner>/<repo>/releases/latest` URL.
+**Actual**: Behaves as expected.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_091' ./internal/updater/...`
+**How we know test is correct**: Four `assert.Contains` checks plus a line-count assertion lock the format down.
+
+## BUG-092 — Non-TTY suppresses reminder
+**Status**: passing
+**Severity**: S3
+**Package**: internal/updater
+**Test**: internal/updater/updater_mocked_test.go:TestUpdater_Mocked/BUG_092_NonTTYNoReminder
+**Spec source**: `internal/updater/reminder.go:26-43`
+**Expected**: `IsTerminal` returns false for a regular file; `ShouldShowReminder` returns false unless disabled=false AND current is tagged AND isStderrTTY=true.
+**Actual**: Behaves as expected for all four gates.
+**Repro**: `go test -race -run 'TestUpdater_Mocked/BUG_092' ./internal/updater/...`
+**How we know test is correct**: Truth-table exhaustion of the three boolean gates plus the IsTerminal probe.
 
 ## Verification
 

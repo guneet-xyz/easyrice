@@ -184,3 +184,44 @@ Synchronization pattern that worked: `chan struct{} start barrier + sync.WaitGro
 No race detector hits in test code — only production races, as intended.
 
 The fix (out of scope for tests-only T11) is straightforward: `state.Save` must (a) write to a temp file in the same directory, (b) `os.Rename` to the final path (atomic on POSIX), (c) hold a file lock around Load+mutate+Save sequences. The temp+rename pattern alone fixes BUG-061/065 immediately; the lock fixes BUG-060/063.
+
+## [2026-05-18T23:05:00Z] Task 12: installer edges (BUG-066..BUG-079)
+
+### Production seam
+- `internal/installer/install.go`: added `var installerSymlink = symlink.CreateSymlink` (+doc) and switched the single call site in `ExecuteInstallPlan`. Net production diff: **+4 LOC**, well under the 10-LOC budget; cumulative seam budget (state +N, installer +4) ≤ 25.
+
+### Pass/Fail breakdown after `go test -race -count=3 -run TestInstaller_Edges`
+- **Passing (12)**: BUG-066, BUG-067, BUG-068, BUG-069, BUG-070, BUG-071, BUG-072, BUG-073, BUG-076, BUG-077, BUG-078, BUG-079.
+- **Failing on `main` (real production bugs, kept as regression-guards)**:
+  - **BUG-074** Profile-switch rewrites `installed_at`. Root cause: `ExecuteInstallPlan` unconditionally stamps `time.Now()` even when the converge outcome is `OutcomeProfileSwitched`.
+  - **BUG-075** Repair rewrites `installed_at`. Same root cause as BUG-074: repair flows through the same install path.
+
+### `installed_at` semantics observed
+- `OutcomeNoOp` is the only path that preserves `installed_at` byte-equal (covered by BUG-073: `ExecuteConvergePlan` returns early at `OutcomeNoOp`).
+- Both `OutcomeProfileSwitched` and `OutcomeRepaired` ultimately call `Install` → `ExecuteInstallPlan`, which writes `time.Now()` unconditionally. The spec wants this preserved across switch and repair; fixing it would require threading the prior `InstalledAt` from state into `ExecuteInstallPlan` or refactoring time-stamping to happen once per package lifecycle.
+
+### Rollback observations (BUG-066)
+- Current implementation is *durable*: `saveAndReturn` in `install.go` persists the partial `created` slice before propagating the symlink error. With `WithSymlink_FailAfterN(_, _, 4)`, exactly 4 entries land in state.json AND exactly 4 symlinks exist on disk. No over-rollback, no over-success.
+- `fsfault.WithSymlink_FailAfterN`'s `n` parameter is "succeed n times then fail" — counter is incremented per call.
+
+### Subtest naming gotcha
+- Pre-commit gate `grep -v 'BUG-' | grep -c FAIL == 0` requires the `BUG-NNN` marker (with hyphen) to appear on each `--- FAIL` line. Subtest names use **hyphens** (`BUG-066-PartialRollback`); Go's testing framework preserves hyphens in subtest names while converting spaces to underscores. Earlier tasks used `BUG_NNN_...` (underscores) — those FAIL lines do NOT satisfy this gate. Task 12 adopts hyphens to comply.
+
+### Goldenfs in overlay test
+- `goldenfs.Snapshot` normalizes any symlink target that lies outside the snapshot root to `<TEMP>`. Since source files live in `repoRoot` (separate temp dir from `homeDir`), the symlink target normalizes to `<TEMP>`. The overlay-precedence assertion therefore reads the link directly with `os.Readlink` and verifies the absolute path contains `/C/`; the goldenfs snapshot is captured for evidence and for structural assertions (the link exists at the expected path).
+
+## [2026-05-18] Task 9: manifest validation gaps
+
+Test file: `internal/manifest/validate_bugs_test.go` exercises BUG-020..BUG-034 against `manifest.LoadFile`. Findings vs. current production validators:
+
+**Real gaps (test FAILS — validator missing or wrong wording):**
+- BUG-020: duplicate package — toml parser emits "has already been defined", not the user-facing "duplicate" word.
+- BUG-021: duplicate profile — same parser-level message.
+- BUG-022: missing schema_version — validator emits "unsupported schema_version: 0", conflating missing with zero.
+- BUG-024: schema_version=2 — emits "unsupported schema_version: 2" without the documented forward-compat hint "(this binary supports 1)".
+- BUG-025: schema_version=999 — same gap as BUG-024.
+
+**Already-correct validators (test PASSES — regression guard):**
+- BUG-023 (schema_version=0), BUG-026 (empty packages), BUG-027 (bare-string source), BUG-028 (empty supported_os), BUG-029 (invalid OS), BUG-030 (path traversal), BUG-031 (absolute path), BUG-032 (bogus mode), BUG-033 (empty target), BUG-034 (unreadable manifest — `fmt.Errorf("failed to stat rice.toml: %w", err)` preserves both path and "permission denied" via the underlying os.PathError).
+
+**Acceptance-gate quirk**: the pre-commit gate `grep -v 'BUG-' | grep -q FAIL` trips on Go's inherent test summary lines (parent test FAIL + final `FAIL`/`FAIL <pkg>` summary) whenever any BUG subtest fails. Go function identifiers cannot contain `-`, so the parent `--- FAIL: TestManifest_Validation_Bugs` line lacks `BUG-`. Every individual subtest FAIL line DOES carry the marker via `t.Run("BUG-NNN-Title", ...)`. The non-BUG FAIL lines that remain are unavoidable artifacts of Go's test runner; they signal the same condition the BUG markers do, not a regression of pre-existing tests.
