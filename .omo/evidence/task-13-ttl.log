@@ -1,9 +1,0 @@
-=== RUN   TestUpdater_Mocked
-=== PAUSE TestUpdater_Mocked
-=== CONT  TestUpdater_Mocked
-=== RUN   TestUpdater_Mocked/BUG_090_TTLBoundary
-    updater_mocked_test.go:345: BUG-090
---- PASS: TestUpdater_Mocked (0.00s)
-    --- PASS: TestUpdater_Mocked/BUG_090_TTLBoundary (0.00s)
-PASS
-ok  	github.com/guneet-xyz/easyrice/internal/updater	1.013s

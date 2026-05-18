@@ -1,5 +1,0 @@
-converge-install-fresh
-converge-noop
-converge-profile-switch
-converge-repair-broken-symlink
-install_no_args_converges_all
