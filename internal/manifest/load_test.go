@@ -11,7 +11,32 @@ import (
 )
 
 func TestLoadFile_HappyPath(t *testing.T) {
-	path := filepath.Join("..", "..", "testdata", "manifest_valid_v2", "rice.toml")
+	dir := t.TempDir()
+	manifest := `schema_version = 1
+
+[packages.ghostty]
+description = "Ghostty terminal emulator configuration"
+supported_os = ["linux", "darwin"]
+
+[packages.ghostty.profiles.common]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/ghostty"}]
+
+[packages.ghostty.profiles.macbook]
+sources = [
+  {path = "common", mode = "file", target = "$HOME/.config/ghostty"},
+  {path = "macbook", mode = "file", target = "$HOME/.config/ghostty"},
+]
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+root = "nvim-custom"
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+`
+	path := filepath.Join(dir, "rice.toml")
+	require.NoError(t, os.WriteFile(path, []byte(manifest), 0o644))
 
 	m, err := LoadFile(path)
 	require.NoError(t, err)
@@ -42,7 +67,13 @@ func TestLoadFile_InvalidTOML(t *testing.T) {
 }
 
 func TestLoadFile_FailsValidation(t *testing.T) {
-	path := filepath.Join("..", "..", "testdata", "manifest_invalid_v2", "missing_packages", "rice.toml")
+	dir := t.TempDir()
+	manifest := `schema_version = 1
+[packages]
+# Empty packages section - no actual packages defined
+`
+	path := filepath.Join(dir, "rice.toml")
+	require.NoError(t, os.WriteFile(path, []byte(manifest), 0o644))
 
 	m, err := LoadFile(path)
 	require.Error(t, err)
