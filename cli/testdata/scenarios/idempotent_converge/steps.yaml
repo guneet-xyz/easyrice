@@ -1,0 +1,23 @@
+steps:
+  - name: "first install demo"
+    args: ["install", "demo", "--profile", "default", "--skip-deps", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      state: "expected/step-0/state.txt"
+  - name: "second install demo is a no-op"
+    args: ["install", "demo", "--profile", "default", "--skip-deps", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_not_contains:
+        - "CONFLICT"
+      state: "expected/step-1/state.txt"

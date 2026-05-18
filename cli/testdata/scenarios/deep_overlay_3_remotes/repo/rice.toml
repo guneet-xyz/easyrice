@@ -1,0 +1,7 @@
+schema_version = 1
+
+[packages.demo]
+supported_os = ["linux", "darwin"]
+
+[packages.demo.profiles.default]
+import = "remotes/remoteA#pkgA.default"

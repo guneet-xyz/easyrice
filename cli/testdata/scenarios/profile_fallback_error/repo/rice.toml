@@ -1,0 +1,7 @@
+schema_version = 1
+
+[packages.linux_only_pkg]
+supported_os = ["windows"]
+
+[packages.linux_only_pkg.profiles.linux-only]
+sources = [{path = "src", mode = "file", target = "$HOME/.config/linux_only_pkg"}]

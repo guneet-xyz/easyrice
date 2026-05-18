@@ -1,0 +1,24 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/demo/default/file1",
+        "target": "<HOME>/.config/demo/file1"
+      },
+      {
+        "source": "<REPO>/demo/default/file2",
+        "target": "<HOME>/.config/demo/file2"
+      },
+      {
+        "source": "<REPO>/demo/default/file3",
+        "target": "<HOME>/.config/demo/file3"
+      },
+      {
+        "source": "<REPO>/demo/default/file4",
+        "target": "<HOME>/.config/demo/file4"
+      }
+    ],
+    "profile": "default"
+  }
+}

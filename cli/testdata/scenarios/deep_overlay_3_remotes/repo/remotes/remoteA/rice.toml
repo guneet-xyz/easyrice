@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.pkgA]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgA.profiles.default]
+import = "remotes/remoteB#pkgB.default"
+sources = [{path = "common", mode = "file", target = "$HOME/.config/deep"}]

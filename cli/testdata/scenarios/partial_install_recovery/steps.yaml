@@ -1,0 +1,34 @@
+steps:
+  - name: "first install creates 4 links"
+    args: ["install", "demo", "--profile", "default", "--skip-deps", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      state: "expected/step-0/state.txt"
+  - name: "manually delete 2 of the 4 symlinks, leaving partial install"
+    args: ["version"]
+    mutate:
+      - op: remove
+        path: <HOME>/.config/demo/file3
+      - op: remove
+        path: <HOME>/.config/demo/file4
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+  - name: "install repairs all 4 links"
+    args: ["install", "demo", "--profile", "default", "--skip-deps", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      state: "expected/step-2/state.txt"

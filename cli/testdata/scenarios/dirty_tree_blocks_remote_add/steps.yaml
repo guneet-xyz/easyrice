@@ -1,0 +1,15 @@
+steps:
+  - name: "drop an untracked file in the managed repo, then attempt remote add"
+    args: ["remote", "add", "fake-url", "--name", "foo"]
+    mutate:
+      - op: write_file
+        path: <REPO>/untracked.txt
+        content: "dirty"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "uncommitted"

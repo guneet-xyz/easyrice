@@ -1,0 +1,7 @@
+schema_version = 1
+
+[packages.pkgC]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgC.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/deep"}]

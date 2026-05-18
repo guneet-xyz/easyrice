@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.pkgB]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgB.profiles.default]
+import = "remotes/remoteC#pkgC.default"
+sources = [{path = "common", mode = "file", target = "$HOME/.config/deep"}]
