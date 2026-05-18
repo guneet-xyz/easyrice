@@ -12,9 +12,31 @@ import (
 
 func folderFixtureRepo(t *testing.T) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "testdata", "install_v2")
 	dst := t.TempDir()
-	require.NoError(t, copyDir(src, dst))
+	const manifest = `schema_version = 1
+
+[packages.nvim]
+description = "Neovim configuration"
+supported_os = ["linux", "darwin"]
+root = "nvim-custom"
+
+[packages.nvim.profiles.default]
+sources = [{path = "config", mode = "folder", target = "$HOME/.config/nvim"}]
+
+[packages.folder-overlay-pkg]
+description = "Package with two folder-mode sources targeting same path (invalid)"
+supported_os = ["linux", "darwin"]
+
+[packages.folder-overlay-pkg.profiles.common]
+sources = [
+  {path = "cfg1", mode = "folder", target = "$HOME/.config/myfolder"},
+  {path = "cfg2", mode = "folder", target = "$HOME/.config/myfolder"},
+]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dst, "rice.toml"), []byte(manifest), 0o644))
+	writeFixtureFile(t, dst, "nvim-custom/config/init.lua", "-- Neovim configuration\nset number\nset expandtab\n")
+	writeFixtureFile(t, dst, "folder-overlay-pkg/cfg1/a.txt", "file1\n")
+	writeFixtureFile(t, dst, "folder-overlay-pkg/cfg2/b.txt", "file2\n")
 	return dst
 }
 
