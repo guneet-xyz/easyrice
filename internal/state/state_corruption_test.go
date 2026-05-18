@@ -93,12 +93,15 @@ func validState() State {
 // BUG-001 — Load on ModeInvalidJSON should return wrapped error mentioning path + parse position
 // Spec source: .omo/plans/better-tests.md L923; AGENTS.md "State File" section
 // Expected: Load returns an error that wraps the underlying parse error AND mentions the
-//   file path (so users can locate the bad file) AND mentions a position/offset.
+//
+//	file path (so users can locate the bad file) AND mentions a position/offset.
+//
 // Actual: state.Load returns the raw json.Unmarshal error — no path, no wrapping. Generic.
 // Repro: Corrupt(path, ModeInvalidJSON); _, err := Load(path); inspect err string.
 // How we know test is correct: a wrapped error citing the path is universally good
-//   practice for file-format errors (cf. fmt.Errorf "%s: %w" convention used throughout
-//   easyrice per AGENTS.md "Errors wrap with fmt.Errorf(\"context: %w\", err) - always").
+//
+//	practice for file-format errors (cf. fmt.Errorf "%s: %w" convention used throughout
+//	easyrice per AGENTS.md "Errors wrap with fmt.Errorf(\"context: %w\", err) - always").
 func TestState_Corruption_BUG_001_InvalidJSON_WrappedErrorMentionsPath(t *testing.T) {
 	t.Log("BUG-001")
 	dir := t.TempDir()
@@ -118,11 +121,14 @@ func TestState_Corruption_BUG_001_InvalidJSON_WrappedErrorMentionsPath(t *testin
 // Spec source: .omo/plans/better-tests.md L924; AGENTS.md "State File" — top-level is a JSON object keyed by package name.
 // Expected: Load returns a clear "state file is not a JSON object" error.
 // Actual: Load returns the generic json.UnmarshalTypeError (does not mention "JSON object"
-//   or recovery hint), or silently returns an empty State.
+//
+//	or recovery hint), or silently returns an empty State.
+//
 // Repro: Corrupt(path, ModeNotAMap); _, err := Load(path).
 // How we know test is correct: the state schema declares `State map[string]PackageState`,
-//   so an array is structurally invalid; a self-describing error is required to let
-//   the user recover (delete vs hand-repair).
+//
+//	so an array is structurally invalid; a self-describing error is required to let
+//	the user recover (delete vs hand-repair).
 func TestState_Corruption_BUG_002_NotAMap_ClearObjectError(t *testing.T) {
 	t.Log("BUG-002")
 	dir := t.TempDir()
@@ -143,11 +149,14 @@ func TestState_Corruption_BUG_002_NotAMap_ClearObjectError(t *testing.T) {
 // Spec source: .omo/plans/better-tests.md L925.
 // Expected: Load returns a clear error explaining the file is `null` (not an object).
 // Actual: json.Unmarshal into a State map accepts `null` and leaves the map nil — Load
-//   then returns (nil, nil) silently, which the caller will treat as "no packages installed".
+//
+//	then returns (nil, nil) silently, which the caller will treat as "no packages installed".
+//
 // Repro: Corrupt(path, ModeNullJSON); s, err := Load(path).
 // How we know test is correct: a `null` state file is corruption, not an empty install.
-//   Treating it as empty risks the user re-installing everything and losing tracking of
-//   pre-existing symlinks (data loss adjacent — S1).
+//
+//	Treating it as empty risks the user re-installing everything and losing tracking of
+//	pre-existing symlinks (data loss adjacent — S1).
 func TestState_Corruption_BUG_003_NullJSON_ClearError(t *testing.T) {
 	t.Log("BUG-003")
 	dir := t.TempDir()
@@ -165,15 +174,22 @@ func TestState_Corruption_BUG_003_NullJSON_ClearError(t *testing.T) {
 
 // BUG-004 — Load on ModeMissingFields should reject PackageState with empty Profile
 // Spec source: .omo/plans/better-tests.md L926; AGENTS.md "State File" example shows
-//   "profile" as a required field on every entry.
+//
+//	"profile" as a required field on every entry.
+//
 // Expected: Load validates that each PackageState has non-empty Profile and returns
-//   an error naming the offending package.
+//
+//	an error naming the offending package.
+//
 // Actual: Load only does json.Unmarshal; no schema validation. Empty string passes through.
-//   (Test currently passes because the empty installed_at string fails time.Time parsing —
-//   wrong reason but still satisfies err != nil; catalog status=passing.)
+//
+//	(Test currently passes because the empty installed_at string fails time.Time parsing —
+//	wrong reason but still satisfies err != nil; catalog status=passing.)
+//
 // Repro: Corrupt(path, ModeMissingFields); _, err := Load(path).
 // How we know test is correct: an empty profile means uninstall cannot select the
-//   right files to remove; downstream code may panic or pick wrong defaults.
+//
+//	right files to remove; downstream code may panic or pick wrong defaults.
 func TestState_Corruption_BUG_004_MissingFields_RejectsEmptyProfile(t *testing.T) {
 	t.Log("BUG-004")
 	dir := t.TempDir()
@@ -189,11 +205,14 @@ func TestState_Corruption_BUG_004_MissingFields_RejectsEmptyProfile(t *testing.T
 // BUG-005 — Load on ModePartialWrite should return wrapped parse error with recovery hint
 // Spec source: .omo/plans/better-tests.md L927.
 // Expected: error wraps the parse error AND the message helps the user recover
-//   (e.g., mentions "backup" or "repair" or a recovery suggestion).
+//
+//	(e.g., mentions "backup" or "repair" or a recovery suggestion).
+//
 // Actual: Load returns the raw json.Unmarshal error — no recovery guidance.
 // Repro: Corrupt(path, ModePartialWrite); _, err := Load(path).
 // How we know test is correct: torn writes are a known crash-recovery scenario;
-//   users hitting this need actionable guidance, not "unexpected end of JSON input".
+//
+//	users hitting this need actionable guidance, not "unexpected end of JSON input".
 func TestState_Corruption_BUG_005_PartialWrite_RecoveryHint(t *testing.T) {
 	t.Log("BUG-005")
 	dir := t.TempDir()
@@ -216,7 +235,8 @@ func TestState_Corruption_BUG_005_PartialWrite_RecoveryHint(t *testing.T) {
 // Actual: bare json.Unmarshal error, no path context.
 // Repro: Corrupt(path, ModeTruncated); _, err := Load(path).
 // How we know test is correct: same wrapping rationale as BUG-001; truncation is just
-//   a different flavor of parse failure and must surface the path for forensics.
+//
+//	a different flavor of parse failure and must surface the path for forensics.
 func TestState_Corruption_BUG_006_Truncated_PathInError(t *testing.T) {
 	t.Log("BUG-006")
 	dir := t.TempDir()
@@ -234,15 +254,24 @@ func TestState_Corruption_BUG_006_Truncated_PathInError(t *testing.T) {
 
 // BUG-007 — Save must be atomic: a faulted write must leave OLD or NEW content, never partial
 // Spec source: .omo/plans/better-tests.md L929; first-principles argument — atomic write
-//   (tmp + fsync + rename) is industry standard for any state file that survives crashes.
+//
+//	(tmp + fsync + rename) is industry standard for any state file that survives crashes.
+//
 // Expected: Save uses a temp file + rename so a write fault leaves the final path either
-//   fully OLD (rename never happened) or fully NEW (rename completed). Never torn.
+//
+//	fully OLD (rename never happened) or fully NEW (rename completed). Never torn.
+//
 // Actual: Save calls os.WriteFile directly on the final path; a partial-then-ENOSPC
-//   write leaves the final state.json torn (first N bytes only). Pure data corruption.
+//
+//	write leaves the final state.json torn (first N bytes only). Pure data corruption.
+//
 // Repro: Save valid; fsfault.WithWriteFile_PartialThenENOSPC(&stateWriteFile, path, N);
-//   call Save with new content; inspect bytes on disk against old and new.
+//
+//	call Save with new content; inspect bytes on disk against old and new.
+//
 // How we know test is correct: we have full control of both old and new content; any
-//   on-disk byte sequence that is neither old nor new is by definition a torn write.
+//
+//	on-disk byte sequence that is neither old nor new is by definition a torn write.
 func TestState_Corruption_BUG_007_Save_Atomicity(t *testing.T) {
 	t.Log("BUG-007")
 	dir := t.TempDir()
@@ -305,14 +334,18 @@ func TestState_Corruption_BUG_007_Save_Atomicity(t *testing.T) {
 // BUG-008 — Save with EACCES via stateOpenFile should surface a clear permission error
 // Spec source: .omo/plans/better-tests.md L930.
 // Expected: Save honors the stateOpenFile seam for the final path (i.e., uses open+write
-//   for atomicity) and returns a wrapped error citing EACCES.
+//
+//	for atomicity) and returns a wrapped error citing EACCES.
+//
 // Actual: Save uses stateWriteFile only; the stateOpenFile seam is never invoked, so
-//   the fault injection has no effect and Save succeeds. This proves Save does not
-//   open the final path through the seam — i.e., no atomic-open path exists.
+//
+//	the fault injection has no effect and Save succeeds. This proves Save does not
+//	open the final path through the seam — i.e., no atomic-open path exists.
+//
 // Repro: fsfault.WithOpenFile_EACCES(&stateOpenFile, finalPath); Save(...); expect err.
 // How we know test is correct: if Save were implemented atomically via OpenFile + write
-//   + rename, the EACCES on the final path's OpenFile (or tmp path) would propagate.
-//   That it does not is the documented gap.
+//   - rename, the EACCES on the final path's OpenFile (or tmp path) would propagate.
+//     That it does not is the documented gap.
 func TestState_Corruption_BUG_008_Save_EACCES_ClearError(t *testing.T) {
 	t.Log("BUG-008")
 	dir := t.TempDir()
@@ -335,7 +368,8 @@ func TestState_Corruption_BUG_008_Save_EACCES_ClearError(t *testing.T) {
 // Actual: Save uses stateWriteFile only; stateOpenFile fault has no effect. Save succeeds.
 // Repro: fsfault.WithOpenFile_ENOSPC(&stateOpenFile, finalPath); Save(...); expect err.
 // How we know test is correct: same argument as BUG-008. A correct atomic implementation
-//   would surface ENOSPC immediately; the current implementation cannot.
+//
+//	would surface ENOSPC immediately; the current implementation cannot.
 func TestState_Corruption_BUG_009_Save_ENOSPC_ClearError(t *testing.T) {
 	t.Log("BUG-009")
 	dir := t.TempDir()

@@ -56,7 +56,10 @@ func Load(path string) (State, error) {
 	return s, nil
 }
 
-// Test-overridable seams (white-box tests in this package).
+// Test-overridable seams. stateWriteFile is wired through Save. stateOpenFile
+// and stateRename are intentional placeholders for an atomic OpenFile+rename
+// implementation that Save does NOT yet have — BUG-008 and BUG-009 assert this
+// gap. Do not remove without updating those tests.
 var (
 	stateOpenFile  = os.OpenFile
 	stateRename    = os.Rename

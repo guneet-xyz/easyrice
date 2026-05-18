@@ -26,15 +26,15 @@ type Profile struct {
 
 // Builder constructs a managed rice repo fixture with optional packages, submodules, and state.
 type Builder struct {
-	t              *testing.T
-	repoPath       string
-	statePath      string
-	homePath       string
-	packages       map[string]manifest.PackageDef
-	submodules     map[string]string // name -> manifestContent
-	staleState     string             // raw state.json content
-	rawManifest    string             // raw rice.toml content (overrides packages)
-	root           string             // optional root override
+	t           *testing.T
+	repoPath    string
+	statePath   string
+	homePath    string
+	packages    map[string]manifest.PackageDef
+	submodules  map[string]string // name -> manifestContent
+	staleState  string            // raw state.json content
+	rawManifest string            // raw rice.toml content (overrides packages)
+	root        string            // optional root override
 }
 
 // New creates a new Builder for a managed repo fixture.
