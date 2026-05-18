@@ -56,6 +56,13 @@ func Load(path string) (State, error) {
 	return s, nil
 }
 
+// Test-overridable seams (white-box tests in this package).
+var (
+	stateOpenFile  = os.OpenFile
+	stateRename    = os.Rename
+	stateWriteFile = func(name string, data []byte, perm os.FileMode) error { return os.WriteFile(name, data, perm) }
+)
+
 // Save writes the state to path as pretty-printed JSON.
 // Creates parent directories if they don't exist.
 func Save(path string, s State) error {
@@ -72,7 +79,7 @@ func Save(path string, s State) error {
 	}
 
 	// Write to file with mode 0644
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := stateWriteFile(path, data, 0644); err != nil {
 		return err
 	}
 
