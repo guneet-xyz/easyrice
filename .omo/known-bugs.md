@@ -45,6 +45,116 @@ Every entry follows this exact template. Copy it verbatim when adding a new entr
 
 ## Catalog
 
+## BUG-040 — Cycle error lacks human-readable arrow path (A→B→A)
+**Status**: failing
+**Severity**: S3
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1117 (Task 10)
+**Expected**: `ResolveSpecs` returns an error of the form `"import cycle detected: a -> b -> a"`.
+**Actual**: Production emits the raw cache key `"import cycle detected: <repoRoot>|a|p|x"`.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-040 -v ./internal/profile/...`
+**How we know test is correct**: AGENTS.md mandates cycle detection; plan promises the arrow path for debuggability.
+
+## BUG-041 — 3-hop cycle error lacks full path
+**Status**: failing
+**Severity**: S3
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1118 (Task 10)
+**Expected**: Error lists full path `"a -> b -> c -> a"`.
+**Actual**: Error wraps each hop with `"remote %q:"` prefixes but still ends with raw cache key.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-041 -v ./internal/profile/...`
+**How we know test is correct**: Same contract as BUG-040, extended to three remotes.
+
+## BUG-042 — Self-import via single remote
+**Status**: passing
+**Severity**: S2
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1119 (Task 10)
+**Expected**: A profile importing `remotes/x#x.p` (where x re-imports itself) errors with `"cycle"`.
+**Actual**: Production correctly detects this degenerate cycle.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-042 -v ./internal/profile/...`
+**How we know test is correct**: Self-loop is the minimal cycle case; AGENTS.md states cycles are detected.
+
+## BUG-043 — Direct self-reference via same-name profile
+**Status**: passing
+**Severity**: S2
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1120 (Task 10)
+**Expected**: A profile imports a remote whose same-name profile imports back; cycle still detected.
+**Actual**: Production correctly detects this name-collision cycle.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-043 -v ./internal/profile/...`
+**How we know test is correct**: Cycle detection is name-agnostic; ping-pong with identical names is still a cycle.
+
+## BUG-044 — Missing remote hint points to wrong command
+**Status**: failing
+**Severity**: S3
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1121 (Task 10)
+**Expected**: Error names the missing remote, says `"not initialized"`, AND hints at `rice remote add`.
+**Actual**: `ErrSubmoduleNotInitialized` hint reads `"run 'rice remote update <name>'"` — wrong command; `update` assumes the submodule exists, `add` is the correct entry point for a missing remote.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-044 -v ./internal/profile/...`
+**How we know test is correct**: AGENTS.md "Managed Repo" section documents `rice remote add` as the create entry point.
+
+## BUG-045 — Missing package in remote names both
+**Status**: passing
+**Severity**: S3
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1122 (Task 10)
+**Expected**: Error names both remote and missing package.
+**Actual**: Production emits `"package %q not found in remote rice %q"` which contains both.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-045 -v ./internal/profile/...`
+**How we know test is correct**: A precise diagnostic is required so users can fix the import quickly.
+
+## BUG-046 — Missing profile in package names remote+pkg+profile
+**Status**: passing
+**Severity**: S3
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1123 (Task 10)
+**Expected**: Error names remote, package, AND missing profile.
+**Actual**: Wrapped error chain `package %q profile %q import: remote %q: profile %q not defined in package %q` contains all three.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-046 -v ./internal/profile/...`
+**How we know test is correct**: Same precision argument as BUG-045, extended to profile level.
+
+## BUG-047 — ParseImportSpec rejects embedded space
+**Status**: passing
+**Severity**: S3
+**Package**: internal/manifest (parser); test lives under internal/profile per Task 10 scope
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1124 (Task 10)
+**Expected**: `ParseImportSpec("remotes/foo bar")` returns a syntactic error.
+**Actual**: Production rejects it (the embedded-space input fails the `#`-separator check).
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-047 -v ./internal/profile/...`
+**How we know test is correct**: AGENTS.md grammar disallows whitespace inside remote names.
+
+## BUG-048 — ParseImportSpec rejects empty parts with named diagnostic
+**Status**: passing
+**Severity**: S3
+**Package**: internal/manifest (parser); test lives under internal/profile per Task 10 scope
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1125 (Task 10)
+**Expected**: Empty remote/package/profile parts each rejected with the offending-part name in the error.
+**Actual**: Production emits `"remote name must not be empty"`, `"package name must not be empty"`, `"profile name must not be empty"`.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-048 -v ./internal/profile/...`
+**How we know test is correct**: AGENTS.md grammar requires all three parts non-empty; the diagnostic must be specific.
+
+## BUG-049 — Import + local sources resolve imported-first then local
+**Status**: passing
+**Severity**: S2
+**Package**: internal/profile
+**Test**: internal/profile/circular_imports_test.go:TestProfile_CircularImports
+**Spec source**: `.omo/plans/better-tests.md` line 1126 (Task 10); AGENTS.md "Source modes" file-mode last-wins.
+**Expected**: When a profile has both `import` and `sources`, resolved list is imported-first, local-last (so file-mode last-wins overlays the imported tree).
+**Actual**: `ResolveSpecs` appends imported specs first, then local sources — matches expectation.
+**Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-049 -v ./internal/profile/...`
+**How we know test is correct**: AGENTS.md mandates file-mode last-wins; spec list ORDER is the contract that drives the overlay walk.
+
 ## BUG-000 — Example — remove before completing Task 18
 **Status**: failing
 **Severity**: S3

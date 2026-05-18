@@ -1,0 +1,13 @@
+=== RUN   TestProfile_CircularImports
+=== RUN   TestProfile_CircularImports/BUG-040_A_B_A
+    circular_imports_test.go:73: BUG-040
+    circular_imports_test.go:89: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:89
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A2881918601/001|a|p|x" does not contain "a -> b -> a"
+        	Test:       	TestProfile_CircularImports/BUG-040_A_B_A
+        	Messages:   	BUG-040: error must show full cycle path 'a -> b -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A2881918601/001|a|p|x
+--- FAIL: TestProfile_CircularImports (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-040_A_B_A (0.09s)
+FAIL
+FAIL	github.com/guneet-xyz/easyrice/internal/profile	0.094s
+FAIL

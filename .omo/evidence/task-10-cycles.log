@@ -1,0 +1,171 @@
+=== RUN   TestProfile_CircularImports
+=== RUN   TestProfile_CircularImports/BUG-040_A_B_A
+    circular_imports_test.go:73: BUG-040
+    circular_imports_test.go:89: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:89
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A181871631/001|a|p|x" does not contain "a -> b -> a"
+        	Test:       	TestProfile_CircularImports/BUG-040_A_B_A
+        	Messages:   	BUG-040: error must show full cycle path 'a -> b -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A181871631/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-041_A_B_C_A
+    circular_imports_test.go:101: BUG-041
+    circular_imports_test.go:118: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:118
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"c\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A1073523752/001|a|p|x" does not contain "a -> b -> c -> a"
+        	Test:       	TestProfile_CircularImports/BUG-041_A_B_C_A
+        	Messages:   	BUG-041: error must list full path 'a -> b -> c -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "c": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A1073523752/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote
+    circular_imports_test.go:131: BUG-042
+=== RUN   TestProfile_CircularImports/BUG-043_Direct_Self_Reference
+    circular_imports_test.go:156: BUG-043
+=== RUN   TestProfile_CircularImports/BUG-044_Missing_Remote
+    circular_imports_test.go:187: BUG-044
+    circular_imports_test.go:204: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:204
+        	Error:      	"package \"pkg\" profile \"default\" import: remote is not initialized; run `rice remote update <name>`: ghost" does not contain "rice remote add"
+        	Test:       	TestProfile_CircularImports/BUG-044_Missing_Remote
+        	Messages:   	BUG-044: error must hint at `rice remote add`; got: package "pkg" profile "default" import: remote is not initialized; run `rice remote update <name>`: ghost
+=== RUN   TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote
+    circular_imports_test.go:216: BUG-045
+=== RUN   TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package
+    circular_imports_test.go:244: BUG-046
+=== RUN   TestProfile_CircularImports/BUG-047_Spec_With_Space
+    circular_imports_test.go:274: BUG-047
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts
+    circular_imports_test.go:296: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay
+    circular_imports_test.go:330: BUG-049
+--- FAIL: TestProfile_CircularImports (0.56s)
+    --- FAIL: TestProfile_CircularImports/BUG-040_A_B_A (0.10s)
+    --- FAIL: TestProfile_CircularImports/BUG-041_A_B_C_A (0.13s)
+    --- PASS: TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote (0.06s)
+    --- PASS: TestProfile_CircularImports/BUG-043_Direct_Self_Reference (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-044_Missing_Remote (0.01s)
+    --- PASS: TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package (0.06s)
+    --- PASS: TestProfile_CircularImports/BUG-047_Spec_With_Space (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay (0.05s)
+=== RUN   TestProfile_CircularImports
+=== RUN   TestProfile_CircularImports/BUG-040_A_B_A
+    circular_imports_test.go:73: BUG-040
+    circular_imports_test.go:89: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:89
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A1440988791/001|a|p|x" does not contain "a -> b -> a"
+        	Test:       	TestProfile_CircularImports/BUG-040_A_B_A
+        	Messages:   	BUG-040: error must show full cycle path 'a -> b -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A1440988791/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-041_A_B_C_A
+    circular_imports_test.go:101: BUG-041
+    circular_imports_test.go:118: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:118
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"c\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A4113534299/001|a|p|x" does not contain "a -> b -> c -> a"
+        	Test:       	TestProfile_CircularImports/BUG-041_A_B_C_A
+        	Messages:   	BUG-041: error must list full path 'a -> b -> c -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "c": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A4113534299/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote
+    circular_imports_test.go:131: BUG-042
+=== RUN   TestProfile_CircularImports/BUG-043_Direct_Self_Reference
+    circular_imports_test.go:156: BUG-043
+=== RUN   TestProfile_CircularImports/BUG-044_Missing_Remote
+    circular_imports_test.go:187: BUG-044
+    circular_imports_test.go:204: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:204
+        	Error:      	"package \"pkg\" profile \"default\" import: remote is not initialized; run `rice remote update <name>`: ghost" does not contain "rice remote add"
+        	Test:       	TestProfile_CircularImports/BUG-044_Missing_Remote
+        	Messages:   	BUG-044: error must hint at `rice remote add`; got: package "pkg" profile "default" import: remote is not initialized; run `rice remote update <name>`: ghost
+=== RUN   TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote
+    circular_imports_test.go:216: BUG-045
+=== RUN   TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package
+    circular_imports_test.go:244: BUG-046
+=== RUN   TestProfile_CircularImports/BUG-047_Spec_With_Space
+    circular_imports_test.go:274: BUG-047
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts
+    circular_imports_test.go:296: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay
+    circular_imports_test.go:330: BUG-049
+--- FAIL: TestProfile_CircularImports (0.55s)
+    --- FAIL: TestProfile_CircularImports/BUG-040_A_B_A (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-041_A_B_C_A (0.13s)
+    --- PASS: TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-043_Direct_Self_Reference (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-044_Missing_Remote (0.01s)
+    --- PASS: TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-047_Spec_With_Space (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay (0.05s)
+=== RUN   TestProfile_CircularImports
+=== RUN   TestProfile_CircularImports/BUG-040_A_B_A
+    circular_imports_test.go:73: BUG-040
+    circular_imports_test.go:89: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:89
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A4135148206/001|a|p|x" does not contain "a -> b -> a"
+        	Test:       	TestProfile_CircularImports/BUG-040_A_B_A
+        	Messages:   	BUG-040: error must show full cycle path 'a -> b -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-040_A_B_A4135148206/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-041_A_B_C_A
+    circular_imports_test.go:101: BUG-041
+    circular_imports_test.go:118: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:118
+        	Error:      	"package \"top\" profile \"start\" import: remote \"a\": package \"p\" profile \"x\" import: remote \"b\": package \"p\" profile \"x\" import: remote \"c\": package \"p\" profile \"x\" import: remote \"a\": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A4218444587/001|a|p|x" does not contain "a -> b -> c -> a"
+        	Test:       	TestProfile_CircularImports/BUG-041_A_B_C_A
+        	Messages:   	BUG-041: error must list full path 'a -> b -> c -> a'; got: package "top" profile "start" import: remote "a": package "p" profile "x" import: remote "b": package "p" profile "x" import: remote "c": package "p" profile "x" import: remote "a": import cycle detected: /tmp/TestProfile_CircularImportsBUG-041_A_B_C_A4218444587/001|a|p|x
+=== RUN   TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote
+    circular_imports_test.go:131: BUG-042
+=== RUN   TestProfile_CircularImports/BUG-043_Direct_Self_Reference
+    circular_imports_test.go:156: BUG-043
+=== RUN   TestProfile_CircularImports/BUG-044_Missing_Remote
+    circular_imports_test.go:187: BUG-044
+    circular_imports_test.go:204: 
+        	Error Trace:	/home/guneet/projects/easyrice.git/wt/better-tests/internal/profile/circular_imports_test.go:204
+        	Error:      	"package \"pkg\" profile \"default\" import: remote is not initialized; run `rice remote update <name>`: ghost" does not contain "rice remote add"
+        	Test:       	TestProfile_CircularImports/BUG-044_Missing_Remote
+        	Messages:   	BUG-044: error must hint at `rice remote add`; got: package "pkg" profile "default" import: remote is not initialized; run `rice remote update <name>`: ghost
+=== RUN   TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote
+    circular_imports_test.go:216: BUG-045
+=== RUN   TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package
+    circular_imports_test.go:244: BUG-046
+=== RUN   TestProfile_CircularImports/BUG-047_Spec_With_Space
+    circular_imports_test.go:274: BUG-047
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts
+    circular_imports_test.go:296: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile
+    circular_imports_test.go:308: BUG-048
+=== RUN   TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay
+    circular_imports_test.go:330: BUG-049
+--- FAIL: TestProfile_CircularImports (0.54s)
+    --- FAIL: TestProfile_CircularImports/BUG-040_A_B_A (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-041_A_B_C_A (0.13s)
+    --- PASS: TestProfile_CircularImports/BUG-042_Self_Import_Via_Remote (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-043_Direct_Self_Reference (0.09s)
+    --- FAIL: TestProfile_CircularImports/BUG-044_Missing_Remote (0.01s)
+    --- PASS: TestProfile_CircularImports/BUG-045_Missing_Package_In_Remote (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-046_Missing_Profile_In_Package (0.05s)
+    --- PASS: TestProfile_CircularImports/BUG-047_Spec_With_Space (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_remote (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_package (0.00s)
+        --- PASS: TestProfile_CircularImports/BUG-048_Empty_Parts/empty_profile (0.00s)
+    --- PASS: TestProfile_CircularImports/BUG-049_Import_Plus_Local_Overlay (0.05s)
+FAIL
+FAIL	github.com/guneet-xyz/easyrice/internal/profile	1.655s
+FAIL
