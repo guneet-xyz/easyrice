@@ -214,6 +214,51 @@ sources = [{path = "src", mode = "file", target = "$HOME/b"}]
 	assert.Contains(t, st, "pkgb")
 }
 
+func TestBuildConvergePlan_NoProfileSpecifiedAndNoStored(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoRoot := filepath.Join(tmpDir, "repo")
+	require.NoError(t, os.MkdirAll(filepath.Join(repoRoot, "testpkg", "src"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "testpkg", "src", "file.txt"), []byte("x"), 0o644))
+
+	homeDir := filepath.Join(tmpDir, "home")
+	require.NoError(t, os.MkdirAll(homeDir, 0o755))
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	mf := `schema_version = 1
+[packages.testpkg]
+supported_os = ["linux", "darwin"]
+[packages.testpkg.profiles.macbook]
+sources = [{path = "src", mode = "file", target = "$HOME/config"}]
+[packages.testpkg.profiles.work]
+sources = [{path = "src", mode = "file", target = "$HOME/config"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(mf), 0o644))
+
+	m, err := manifest.LoadFile(filepath.Join(repoRoot, "rice.toml"))
+	require.NoError(t, err)
+
+	pkg, ok := m.Packages["testpkg"]
+	require.True(t, ok)
+
+	statePath := filepath.Join(tmpDir, "state.json")
+	req := ConvergeRequest{
+		RepoRoot:         repoRoot,
+		PackageName:      "testpkg",
+		RequestedProfile: "", // no profile requested
+		CurrentOS:        runtime.GOOS,
+		HomeDir:          homeDir,
+		StatePath:        statePath,
+		Pkg:              &pkg,
+		Manifest:         m,
+	}
+
+	cr, err := BuildConvergePlan(req)
+	require.Error(t, err)
+	assert.Nil(t, cr)
+	assert.Contains(t, err.Error(), "Available profiles: macbook, work")
+}
+
 func mustBuild(t *testing.T, req ConvergeRequest) *ConvergeResult {
 	t.Helper()
 	cr, err := BuildConvergePlan(req)

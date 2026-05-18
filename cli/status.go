@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -156,6 +157,18 @@ func collectPackageNames(mf *manifest.Manifest, st state.State, filter string) [
 	return out
 }
 
+func formatProfilesLine(profiles []string, active string) string {
+	parts := make([]string, len(profiles))
+	for i, p := range profiles {
+		if p == active {
+			parts[i] = "*" + p
+		} else {
+			parts[i] = p
+		}
+	}
+	return "    profiles: " + strings.Join(parts, ", ") + "\n"
+}
+
 func renderPackageLine(w io.Writer, name string, mf *manifest.Manifest, st state.State) {
 	pkgState, installed := st[name]
 	declared := false
@@ -166,6 +179,9 @@ func renderPackageLine(w io.Writer, name string, mf *manifest.Manifest, st state
 	switch {
 	case !installed:
 		fmt.Fprintf(w, "  [%s]    %s\n", pkgStatusNotInstalled, name)
+		if declared {
+			fmt.Fprint(w, formatProfilesLine(manifest.SortedProfileNames(mf.Packages[name]), ""))
+		}
 	case installed && !declared:
 		fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusUntrackedInst, name, pkgState.Profile)
 	default:
@@ -175,8 +191,10 @@ func renderPackageLine(w io.Writer, name string, mf *manifest.Manifest, st state
 			for _, link := range broken {
 				fmt.Fprintf(w, "    broken link: %s -> %s\n", link.Target, link.Source)
 			}
+			fmt.Fprint(w, formatProfilesLine(manifest.SortedProfileNames(mf.Packages[name]), pkgState.Profile))
 		} else {
 			fmt.Fprintf(w, "  [%s]    %s (profile: %s)\n", pkgStatusOK, name, pkgState.Profile)
+			fmt.Fprint(w, formatProfilesLine(manifest.SortedProfileNames(mf.Packages[name]), pkgState.Profile))
 		}
 	}
 }

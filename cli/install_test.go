@@ -848,3 +848,57 @@ func TestInstall_DirtyWarningIncludesPath(t *testing.T) {
 	assert.Contains(t, out, "Warning: the rice repo has uncommitted changes at "+repoRoot)
 	assert.Contains(t, out, "Install will continue")
 }
+
+// TestInstall_NoProfileAutoChooseShowsAvailable asserts that when no profile
+// can be auto-chosen (no flag, no stored state, no hostname match, no default,
+// multiple profiles), the error message includes the list of available profiles.
+func TestInstall_NoProfileAutoChooseShowsAvailable(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+	homeDir := setIsolatedHome(t)
+	repoRoot := repo.DefaultRepoPath()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	pkgDir := filepath.Join(repoRoot, "multipkg")
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "macbook"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(pkgDir, "work"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(pkgDir, "macbook", "config.txt"),
+		[]byte("macbook config\n"), 0o644))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(pkgDir, "work", "config.txt"),
+		[]byte("work config\n"), 0o644))
+
+	manifest := `schema_version = 1
+
+[packages.multipkg]
+description = "Package with multiple profiles"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.multipkg.profiles.macbook]
+sources = [{path = "macbook", mode = "file", target = "$HOME"}]
+
+[packages.multipkg.profiles.work]
+sources = [{path = "work", mode = "file", target = "$HOME"}]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "rice.toml"), []byte(manifest), 0o644))
+
+	_, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"--yes",
+		"install", "multipkg",
+	)
+	require.Error(t, err, "expected error when no profile can be auto-chosen")
+	assert.Contains(t, err.Error(), "could not choose a profile automatically",
+		"error must mention auto-choose failure; got: %v", err)
+	assert.Contains(t, err.Error(), "Available profiles:",
+		"error must list available profiles; got: %v", err)
+	assert.Contains(t, err.Error(), "macbook",
+		"error must include 'macbook' profile; got: %v", err)
+	assert.Contains(t, err.Error(), "work",
+		"error must include 'work' profile; got: %v", err)
+
+	_, statErr := os.Stat(statePath)
+	assert.True(t, os.IsNotExist(statErr), "state.json must not be created on auto-choose failure")
+	_ = homeDir
+}

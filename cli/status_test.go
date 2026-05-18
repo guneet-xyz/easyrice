@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -533,4 +534,205 @@ func TestStatus_SummaryLine_PlainMode(t *testing.T) {
 	require.NoError(t, err, "out=%s", out)
 	assert.Contains(t, out, "Total: 1 packages -- 1 installed, 0 not installed, 0 broken.")
 	assert.NotContains(t, out, "—")
+}
+
+func TestRenderPackageLine_OkWithActiveHighlight(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	source := filepath.Join(tmp, "src")
+	target := filepath.Join(tmp, "tgt")
+	require.NoError(t, os.WriteFile(source, []byte("x"), 0o644))
+	require.NoError(t, os.Symlink(source, target))
+
+	writeStatusState(t, statePath, state.State{
+		"mypkg": state.PackageState{
+			Profile:        "macbook",
+			InstalledLinks: []state.InstalledLink{{Source: source, Target: target}},
+			InstalledAt:    time.Now(),
+		},
+	})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.mypkg]
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.mypkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.mypkg.profiles.macbook]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.mypkg.profiles.work]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[OK]")
+	assert.Contains(t, out, "    profiles: common, *macbook, work")
+}
+
+func TestRenderPackageLine_NotInstalledNoHighlight(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+	writeStatusState(t, statePath, state.State{})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.mypkg]
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.mypkg.profiles.a]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.mypkg.profiles.b]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[NOT INSTALLED]")
+	assert.Contains(t, out, "    profiles: a, b")
+	assert.NotContains(t, out, "*a")
+	assert.NotContains(t, out, "*b")
+}
+
+func TestRenderPackageLine_BrokenWithActiveHighlight(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	expectedSource := filepath.Join(tmp, "expected.toml")
+	otherSource := filepath.Join(tmp, "other.toml")
+	target := filepath.Join(tmp, "tgt.toml")
+	require.NoError(t, os.WriteFile(expectedSource, []byte("x"), 0o644))
+	require.NoError(t, os.WriteFile(otherSource, []byte("y"), 0o644))
+	require.NoError(t, os.Symlink(otherSource, target))
+
+	writeStatusState(t, statePath, state.State{
+		"mypkg": state.PackageState{
+			Profile:        "work",
+			InstalledLinks: []state.InstalledLink{{Source: expectedSource, Target: target}},
+			InstalledAt:    time.Now(),
+		},
+	})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.mypkg]
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.mypkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.mypkg.profiles.macbook]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+
+[packages.mypkg.profiles.work]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[BROKEN]")
+	assert.Contains(t, out, "broken link:")
+	assert.Contains(t, out, "    profiles: common, macbook, *work")
+}
+
+func TestRenderPackageLine_UntrackedNoProfilesLine(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+
+	source := filepath.Join(tmp, "src")
+	target := filepath.Join(tmp, "tgt")
+	require.NoError(t, os.WriteFile(source, []byte("x"), 0o644))
+	require.NoError(t, os.Symlink(source, target))
+
+	writeStatusState(t, statePath, state.State{
+		"untracked": state.PackageState{
+			Profile:        "custom",
+			InstalledLinks: []state.InstalledLink{{Source: source, Target: target}},
+			InstalledAt:    time.Now(),
+		},
+	})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.mypkg]
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.mypkg.profiles.common]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[UNTRACKED]")
+	assert.Contains(t, out, "untracked")
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "[UNTRACKED]") {
+			if i+1 < len(lines) {
+				nextLine := lines[i+1]
+				assert.NotContains(t, nextLine, "profiles:")
+			}
+		}
+	}
+}
+
+func TestRenderPackageLine_SingleProfileNotInstalled(t *testing.T) {
+	resetInstallFlags()
+	setIsolatedHome(t)
+	tmp := t.TempDir()
+	statePath := filepath.Join(tmp, "state.json")
+	writeStatusState(t, statePath, state.State{})
+
+	repoRoot := writeRepoManifest(t, `schema_version = 1
+
+[packages.mypkg]
+description = "Test package"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.mypkg.profiles.default]
+sources = [{path = "x", mode = "file", target = "$HOME"}]
+`)
+	gitInitRepo(t, repoRoot)
+
+	out, err := runInstallCmd(t, "",
+		"--state", statePath,
+		"status",
+	)
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "[NOT INSTALLED]")
+	assert.Contains(t, out, "    profiles: default")
+	assert.NotContains(t, out, "*default")
 }

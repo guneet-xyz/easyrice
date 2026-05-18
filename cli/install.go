@@ -201,7 +201,8 @@ func runInstallOne(cmd *cobra.Command, repoRoot, home string, mf *manifest.Manif
 		chosen = resolveDefaultProfile(&pkgDef, pkgName, flagProfile, st)
 	}
 	if chosen == "" {
-		return fmt.Errorf("package %q: could not choose a profile automatically; pass --profile <name>", pkgName)
+		profiles := manifest.SortedProfileNames(pkgDef)
+		return fmt.Errorf("package %q: could not choose a profile automatically; pass --profile <name>. Available profiles: %s", pkgName, strings.Join(profiles, ", "))
 	}
 
 	req := installer.ConvergeRequest{

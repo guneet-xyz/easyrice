@@ -3,6 +3,7 @@ package installer
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/plan"
@@ -62,7 +63,8 @@ func BuildConvergePlan(req ConvergeRequest) (*ConvergeResult, error) {
 		targetProfile = pkgState.Profile
 	}
 	if targetProfile == "" {
-		return nil, fmt.Errorf("package %q: no profile specified and no stored profile", req.PackageName)
+		profiles := manifest.SortedProfileNames(*req.Pkg)
+		return nil, fmt.Errorf("package %q: no profile specified and no stored profile. Available profiles: %s", req.PackageName, strings.Join(profiles, ", "))
 	}
 
 	if !installed {
