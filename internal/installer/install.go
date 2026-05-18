@@ -18,6 +18,10 @@ import (
 	"github.com/guneet-xyz/easyrice/internal/symlink"
 )
 
+// installerSymlink is a test-overridable seam for symlink creation. Production
+// callers use symlink.CreateSymlink; tests replace this via fsfault helpers.
+var installerSymlink = symlink.CreateSymlink
+
 // InstallRequest captures all inputs needed to compute and execute an install.
 // The caller is responsible for loading the manifest, looking up the requested
 // PackageDef, performing the OS gate check, and resolving the profile to specs
@@ -305,7 +309,7 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 			)
 			return saveAndReturn(fmt.Errorf("failed to create parent directory for %s: %w", op.Target, err))
 		}
-		err := symlink.CreateSymlink(op.Source, op.Target)
+		err := installerSymlink(op.Source, op.Target)
 		if err != nil {
 			// Idempotency: if target already a symlink to our source, treat as success.
 			isOurs, checkErr := symlink.IsSymlinkTo(op.Target, op.Source)

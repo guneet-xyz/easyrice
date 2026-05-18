@@ -415,3 +415,168 @@ NNN is a zero-padded 3-digit number (001, 002, ..., 199). Blocks are reserved pe
 - 180-199: E2E scenarios
 
 When a block fills up, extend it in increments of 20 and update this section in the same PR.
+
+## BUG-020 — Duplicate package name silently accepted
+**Status**: failing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-020-DuplicatePackage
+**Spec source**: AGENTS.md "rice.toml Schema" — packages keyed by name imply uniqueness
+**Expected**: LoadFile returns error containing "duplicate" and "foo"
+**Actual**: go-toml parser emits generic "Key 'packages.foo' has already been defined" without the user-facing "duplicate" word
+**Repro**: write a rice.toml declaring `[packages.foo]` twice; call manifest.LoadFile
+**How we know test is correct**: a single keyed table cannot meaningfully have two definitions; surfacing "duplicate" matches the documented intent and is more actionable than the parser-level message
+
+## BUG-021 — Duplicate profile name within a package silently accepted
+**Status**: failing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-021-DuplicateProfile
+**Spec source**: AGENTS.md "rice.toml Schema" — profiles keyed by name
+**Expected**: error containing "duplicate" and "bar"
+**Actual**: generic go-toml "has already been defined" parser error
+**Repro**: declare `[packages.foo.profiles.bar]` twice; call LoadFile
+**How we know test is correct**: same uniqueness invariant as BUG-020 applied at profile level
+
+## BUG-022 — Missing schema_version not explicitly rejected
+**Status**: failing
+**Severity**: S3
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-022-SchemaVersionMissing
+**Spec source**: AGENTS.md schema table — schema_version is required
+**Expected**: error message "schema_version is required"
+**Actual**: validator reports "unsupported schema_version: 0", conflating "missing" with "set to zero"
+**Repro**: write a rice.toml with no schema_version field; call LoadFile
+**How we know test is correct**: a clear "is required" message tells the user which field they forgot; "unsupported: 0" implies they set it to 0 on purpose
+
+## BUG-023 — schema_version = 0 should error
+**Status**: passing
+**Severity**: S3
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-023-SchemaVersionZero
+**Spec source**: AGENTS.md — schema_version must be 1
+**Expected**: any error mentioning schema_version
+**Actual**: already rejected by Validate ("unsupported schema_version: 0")
+**Repro**: schema_version = 0 in rice.toml; LoadFile errors
+**How we know test is correct**: 0 is not 1; current behavior matches intent; test is a regression guard
+
+## BUG-024 — schema_version = 2 missing forward-compat hint
+**Status**: failing
+**Severity**: S3
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-024-SchemaVersionFuture2
+**Spec source**: AGENTS.md — schema_version bumps only on breaking changes; better-tests.md Task 9 line 1025
+**Expected**: error "unsupported schema_version 2 (this binary supports 1)"
+**Actual**: error "unsupported schema_version: 2" — no hint about which version the binary supports
+**Repro**: schema_version = 2 in rice.toml; LoadFile errors with current less-informative message
+**How we know test is correct**: forward-compat scenarios (user has newer schema, older binary) should tell the user to upgrade the binary
+
+## BUG-025 — schema_version = 999 missing forward-compat hint
+**Status**: failing
+**Severity**: S3
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-025-SchemaVersionFuture999
+**Spec source**: same as BUG-024
+**Expected**: error "unsupported schema_version 999 (this binary supports 1)"
+**Actual**: "unsupported schema_version: 999"
+**Repro**: schema_version = 999 in rice.toml; LoadFile errors with less-informative message
+**How we know test is correct**: same as BUG-024; consistent wording across all future versions
+
+## BUG-026 — Empty [packages] table rejected
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-026-EmptyPackages
+**Spec source**: AGENTS.md — at least one package must be declared
+**Expected**: error containing "no packages declared"
+**Actual**: already rejected by Validate
+**Repro**: rice.toml with `[packages]` but no children
+**How we know test is correct**: matches documented message verbatim; regression guard
+
+## BUG-027 — Bare-string source rejected at LoadFile integration level
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-027-BareStringSource
+**Spec source**: AGENTS.md — inline table form ONLY for sources
+**Expected**: LoadFile error for `sources = ["bare-string"]`
+**Actual**: SourceSpec.UnmarshalTOML rejects non-table forms; the rejection propagates through LoadFile
+**Repro**: rice.toml with bare-string source entry
+**How we know test is correct**: documented schema requirement; verified at integration level (not just at unmarshal)
+
+## BUG-028 — supported_os = [] rejected
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-028-SupportedOSEmpty
+**Spec source**: AGENTS.md — supported_os required, non-empty
+**Expected**: error mentioning supported_os
+**Actual**: Validate rejects with "supported_os must not be empty"
+**Repro**: supported_os = [] in a package; LoadFile errors
+**How we know test is correct**: matches schema invariant; regression guard
+
+## BUG-029 — supported_os = ["bsd"] rejected (invalid OS)
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-029-SupportedOSInvalid
+**Spec source**: AGENTS.md — OS allowlist (linux, darwin, windows)
+**Expected**: error mentioning the offending value
+**Actual**: Validate rejects with "unsupported OS: \"bsd\""
+**Repro**: supported_os = ["bsd"]; LoadFile errors
+**How we know test is correct**: matches documented allowlist; regression guard
+
+## BUG-030 — Source path "../escape" rejected (path traversal)
+**Status**: passing
+**Severity**: S1
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-030-PathTraversal
+**Spec source**: AGENTS.md — paths interpreted relative to package root; no traversal allowed
+**Expected**: error mentioning ".."
+**Actual**: Validate rejects with "path must not contain .. segments"
+**Repro**: source path = "../escape"; LoadFile errors
+**How we know test is correct**: traversal is a security boundary; regression guard
+
+## BUG-031 — Source path "/absolute" rejected (must be relative)
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-031-AbsolutePath
+**Spec source**: AGENTS.md — path interpreted relative to package root
+**Expected**: error mentioning "relative"
+**Actual**: Validate rejects with "path must be relative"
+**Repro**: source path = "/absolute"; LoadFile errors
+**How we know test is correct**: matches documented behavior; regression guard
+
+## BUG-032 — Source mode = "bogus" rejected
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-032-BogusMode
+**Spec source**: AGENTS.md — mode allowlist (file, folder)
+**Expected**: error mentioning "mode"
+**Actual**: Validate rejects with 'mode must be "file" or "folder"'
+**Repro**: source mode = "bogus"; LoadFile errors
+**How we know test is correct**: matches documented allowlist; regression guard
+
+## BUG-033 — Source target = "" rejected
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-033-EmptyTarget
+**Spec source**: AGENTS.md — target required
+**Expected**: error mentioning "target"
+**Actual**: Validate rejects with "target must not be empty"
+**Repro**: source target = ""; LoadFile errors
+**How we know test is correct**: matches documented requirement; regression guard
+
+## BUG-034 — Unreadable manifest error names file path AND permission detail
+**Status**: passing
+**Severity**: S3
+**Package**: internal/manifest
+**Test**: internal/manifest/validate_bugs_test.go:TestManifest_Validation_Bugs/BUG-034-UnreadableManifest
+**Spec source**: AGENTS.md error-wrap convention `fmt.Errorf("context: %w", err)`
+**Expected**: wrapped error mentions file path AND permission detail
+**Actual**: LoadFile wraps the os error preserving the path and "permission denied" text from the underlying syscall
+**Repro**: chmod 000 on rice.toml; call LoadFile; skip if root
+**How we know test is correct**: a permission-denied error without a path is unactionable; the wrap convention guarantees both
