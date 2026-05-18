@@ -63,7 +63,8 @@ func setupScenarioSandbox(t *testing.T) scenarioSandbox {
 	repoRoot := repo.DefaultRepoPath()
 	require.NoError(t, os.MkdirAll(repoRoot, 0o755))
 
-	stateFile := filepath.Join(t.TempDir(), "state.json")
+	stateFile := filepath.Join(homeDir, ".config", "easyrice", "state.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stateFile), 0o755))
 	return scenarioSandbox{HomeDir: homeDir, RepoRoot: repoRoot, StateFile: stateFile}
 }
 
@@ -93,6 +94,34 @@ func TestScenario_InstallProfileHappy(t *testing.T) {
 	t.Cleanup(resetInstallFlags)
 
 	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_profile_happy"))
+	require.NoError(t, err)
+
+	sb := setupScenarioSandbox(t)
+	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
+
+	scenarioDir := renderScenario(t, srcDir, sb)
+	scenario.Run(t, scenarioDir, newScenarioConfig())
+}
+
+func TestScenario_InstallDepsMock(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_deps_mock"))
+	require.NoError(t, err)
+
+	sb := setupScenarioSandbox(t)
+	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
+
+	scenarioDir := renderScenario(t, srcDir, sb)
+	scenario.Run(t, scenarioDir, newScenarioConfig())
+}
+
+func TestScenario_InstallStdinConfirm(t *testing.T) {
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_stdin_confirm"))
 	require.NoError(t, err)
 
 	sb := setupScenarioSandbox(t)

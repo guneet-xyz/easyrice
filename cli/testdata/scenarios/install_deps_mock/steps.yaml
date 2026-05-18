@@ -1,0 +1,14 @@
+mocks:
+  - deps_mock
+steps:
+  - name: "install demo with mocked deps runner"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      state: "expected/step-0/state.txt"

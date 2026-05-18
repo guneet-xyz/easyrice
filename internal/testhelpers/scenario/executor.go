@@ -43,6 +43,7 @@ func Run(t *testing.T, scenarioDir string, cfg Config) {
 			}
 
 			stdout, runErr := cfg.Runner(step.Args, strings.NewReader(step.Stdin))
+			normalizedStdout := string(normalizeStdout([]byte(stdout)))
 
 			if cfg.Reset != nil {
 				cfg.Reset()
@@ -57,19 +58,19 @@ func Run(t *testing.T, scenarioDir string, cfg Config) {
 			}
 
 			for _, s := range step.Expect.StdoutContains {
-				if !strings.Contains(stdout, s) {
-					t.Errorf("step %q: stdout does not contain %q\nstdout:\n%s", step.Name, s, stdout)
+				if !strings.Contains(normalizedStdout, s) {
+					t.Errorf("step %q: stdout does not contain %q\nstdout:\n%s", step.Name, s, normalizedStdout)
 				}
 			}
 
 			for _, s := range step.Expect.StdoutNotContains {
-				if strings.Contains(stdout, s) {
-					t.Errorf("step %q: stdout should not contain %q\nstdout:\n%s", step.Name, s, stdout)
+				if strings.Contains(normalizedStdout, s) {
+					t.Errorf("step %q: stdout should not contain %q\nstdout:\n%s", step.Name, s, normalizedStdout)
 				}
 			}
 
-			if step.Expect.StdoutEquals != "" && stdout != step.Expect.StdoutEquals {
-				t.Errorf("step %q: stdout mismatch\nwant: %q\ngot:  %q", step.Name, step.Expect.StdoutEquals, stdout)
+			if step.Expect.StdoutEquals != "" && normalizedStdout != step.Expect.StdoutEquals {
+				t.Errorf("step %q: stdout mismatch\nwant: %q\ngot:  %q", step.Name, step.Expect.StdoutEquals, normalizedStdout)
 			}
 
 			if step.Expect.Home != "" {

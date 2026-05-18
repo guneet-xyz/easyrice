@@ -8,13 +8,30 @@ import (
 	"os"
 	"testing"
 
+	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
 
 // scenarioMockRegistry maps mock names to setup functions for scenario-based tests.
 // Individual test files add entries as needed.
-var scenarioMockRegistry = map[string]func(testing.TB){}
+var scenarioMockRegistry = map[string]func(testing.TB){
+	// deps_mock injects a deps.MockRunner that reports `ripgrep` is already
+	// installed (single rg --version probe returning exit 0). It restores the
+	// previous DepsRunner via t.Cleanup. Scenarios that use this mock must
+	// declare a package whose only dependency is `ripgrep`.
+	"deps_mock": func(t testing.TB) {
+		t.Helper()
+		mock := &deps.MockRunner{
+			Expectations: []deps.MockExpectation{
+				{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 0, Combined: []byte("ripgrep 14.1.0\n")}},
+			},
+		}
+		orig := DepsRunner
+		DepsRunner = mock
+		t.Cleanup(func() { DepsRunner = orig })
+	},
+}
 
 // newScenarioConfig builds a scenario.Config wired to the real cobra rootCmd.
 func newScenarioConfig() scenario.Config {

@@ -1,0 +1,13 @@
+steps:
+  - name: "install demo with stdin confirmation"
+    args: ["install", "demo", "--profile", "default", "--state", "__STATE__"]
+    stdin: "y\n"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Apply this plan?"
+      state: "expected/step-0/state.txt"

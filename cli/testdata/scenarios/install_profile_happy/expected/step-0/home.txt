@@ -8,5 +8,6 @@
 .config/easyrice/repos/default/ghostty/common [dir]
 .config/easyrice/repos/default/ghostty/common/config [file]
 .config/easyrice/repos/default/rice.toml [file]
+.config/easyrice/state.json [file]
 .config/ghostty [dir]
 .config/ghostty/config -> <REPO>/ghostty/common/config
