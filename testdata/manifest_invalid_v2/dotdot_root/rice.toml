@@ -1,9 +1,0 @@
-schema_version = 1
-
-[packages.badpkg]
-description = "Package with path traversal in root"
-supported_os = ["linux", "darwin"]
-root = "../escape"
-
-[packages.badpkg.profiles.default]
-sources = [{path = "config", mode = "file", target = "$HOME/.config/badpkg"}]

@@ -1,0 +1,17 @@
+ok  	github.com/guneet-xyz/easyrice/cli	3.330s
+ok  	github.com/guneet-xyz/easyrice/internal/deps	1.037s
+ok  	github.com/guneet-xyz/easyrice/internal/doctor	1.192s
+ok  	github.com/guneet-xyz/easyrice/internal/installer	1.063s
+ok  	github.com/guneet-xyz/easyrice/internal/logger	1.015s
+ok  	github.com/guneet-xyz/easyrice/internal/manifest	1.025s
+ok  	github.com/guneet-xyz/easyrice/internal/plan	1.012s
+ok  	github.com/guneet-xyz/easyrice/internal/profile	1.019s
+ok  	github.com/guneet-xyz/easyrice/internal/prompt	1.018s
+ok  	github.com/guneet-xyz/easyrice/internal/repo	1.466s
+ok  	github.com/guneet-xyz/easyrice/internal/state	1.014s
+ok  	github.com/guneet-xyz/easyrice/internal/style	1.007s
+ok  	github.com/guneet-xyz/easyrice/internal/symlink	1.009s
+ok  	github.com/guneet-xyz/easyrice/internal/testhelpers	1.013s
+ok  	github.com/guneet-xyz/easyrice/internal/testhelpers/scenario	1.019s
+ok  	github.com/guneet-xyz/easyrice/internal/updater	1.691s
+ok  	github.com/guneet-xyz/easyrice/internal/xdgpath	1.008s
