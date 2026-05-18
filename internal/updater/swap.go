@@ -33,11 +33,11 @@ func (u *Updater) Apply(ctx context.Context, release *Release) error {
 		return fmt.Errorf("updater: apply: release is nil")
 	}
 
-	releaseLock, err := acquireLock(u.opts.CacheDir)
+	releaseLock, err := u.opts.Locker.Acquire(u.opts.CacheDir)
 	if err != nil {
 		return fmt.Errorf("updater: acquire lock: %w", err)
 	}
-	defer releaseLock()
+	defer func() { _ = releaseLock() }()
 
 	exe, err := os.Executable()
 	if err != nil {

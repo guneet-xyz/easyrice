@@ -56,3 +56,18 @@ func TestDefaultCacheDir_EndsInEasyrice(t *testing.T) {
 		assert.True(t, strings.Contains(got, "easyrice"), "got %q", got)
 	}
 }
+
+func TestNew_ZeroOptions(t *testing.T) {
+	u, err := New(Options{Owner: "x", Repo: "y"})
+	require.NoError(t, err)
+	require.NotNil(t, u)
+	assert.NotNil(t, u.opts.Clock, "default Clock must be wired")
+	assert.NotNil(t, u.opts.Locker, "default Locker must be wired")
+	assert.Nil(t, u.opts.Fetcher, "Fetcher default stays nil; FetchLatest falls back to built-in GitHub path")
+	_, ok := u.opts.Clock.(realClock)
+	assert.True(t, ok, "default Clock must be realClock")
+	_, ok = u.opts.Locker.(flockLocker)
+	assert.True(t, ok, "default Locker must be flockLocker")
+	now := u.opts.Clock.Now()
+	assert.False(t, now.IsZero(), "default Clock.Now() must return non-zero time")
+}

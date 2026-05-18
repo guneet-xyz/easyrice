@@ -33,3 +33,18 @@ Severity: S1=data loss, S2=feature broken, S3=UX wart. Status: failing | passing
 Catalog freshness is enforced by the bash one-liner under `## Verification` in the catalog file. Every test marker `BUG-NNN` must have a matching `## BUG-NNN` header in the catalog.
 
 Placeholder `BUG-000` is present and must be removed before Task 18 is marked complete.
+
+## [2026-05-18T17:23:53Z] Task 6: updater interfaces
+
+- Defined exported interfaces in `internal/updater/types.go` (alongside Options/Release/CheckResult), not a new file — keeps the package surface compact.
+  - `ReleaseFetcher` — `FetchLatest(ctx) (*Release, error)`
+  - `Clock` — `Now() time.Time`
+  - `Locker` — `Acquire(path) (release func() error, err error)`
+- Default wiring in `New(opts)`:
+  - `opts.Clock` defaults to `realClock{}` (calls `time.Now()`).
+  - `opts.Locker` defaults to `flockLocker{}`, a thin adapter around the existing unexported `acquireLock(cacheDir)` whose returned closure is wrapped to satisfy `func() error` (acquireLock returns `func()`).
+  - `opts.Fetcher` is **not** assigned a non-nil default; instead the existing dispatch in `FetchLatest` (`if u.fetcher != nil ... else fetchLatestFromGitHub`) is preserved. This keeps behavior identical to pre-refactor and avoids breaking the fetch tests that explicitly assign `u.fetcher = nil` to exercise the go-selfupdate code path via `u.sourceFactory`.
+  - `opts.Fetcher` is still copied into the existing unexported `u.fetcher` field at construction time, so external callers can inject a `ReleaseFetcher` via the public Options field.
+- Internal unexported field `fetcher` retypes from `releaseFetcher` to `ReleaseFetcher` (the exported alias) so existing test assignments (`u.fetcher = fakeFetcher`) keep compiling.
+- `cache.go` swaps the single `time.Now()` call for `u.opts.Clock.Now()`.
+- `swap.go` swaps `acquireLock(u.opts.CacheDir)` for `u.opts.Locker.Acquire(u.opts.CacheDir)` and wraps the deferred release in `func() { _ = releaseLock() }` to discard the new error return.

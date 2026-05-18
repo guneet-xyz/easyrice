@@ -84,7 +84,7 @@ func saveCache(dir string, c *cacheFile) error {
 // the network. Dev builds short-circuit to UpdateAvailable=false without
 // touching the cache or the network.
 func (u *Updater) CheckCached(ctx context.Context, current string) (*CheckResult, error) {
-	now := time.Now()
+	now := u.opts.Clock.Now()
 
 	if IsDevBuild(current) {
 		return &CheckResult{

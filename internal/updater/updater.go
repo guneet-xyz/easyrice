@@ -1,7 +1,6 @@
 package updater
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -16,15 +15,9 @@ import (
 // The Updater type is injectable and carries state for HTTP client, cache directory, and GitHub credentials.
 type Updater struct {
 	opts          Options
-	fetcher       releaseFetcher
+	fetcher       ReleaseFetcher
 	swapper       swapper
 	sourceFactory func() (selfupdate.Source, error)
-}
-
-// releaseFetcher abstracts release lookup behind an interface so callers can
-// substitute alternative sources (default: GitHub via go-selfupdate).
-type releaseFetcher interface {
-	FetchLatest(ctx context.Context) (*Release, error)
 }
 
 // New constructs a new Updater with the given options.
@@ -37,7 +30,6 @@ func New(opts Options) (*Updater, error) {
 		return nil, errors.New("updater: Repo is required")
 	}
 
-	// Set defaults if not provided
 	if opts.Timeout == 0 {
 		opts.Timeout = 30 * time.Second
 	}
@@ -47,6 +39,12 @@ func New(opts Options) (*Updater, error) {
 	if opts.CacheDir == "" {
 		opts.CacheDir = DefaultCacheDir()
 	}
+	if opts.Clock == nil {
+		opts.Clock = realClock{}
+	}
+	if opts.Locker == nil {
+		opts.Locker = flockLocker{}
+	}
 
-	return &Updater{opts: opts, swapper: &goSelfupdateSwapper{}}, nil
+	return &Updater{opts: opts, fetcher: opts.Fetcher, swapper: &goSelfupdateSwapper{}}, nil
 }
