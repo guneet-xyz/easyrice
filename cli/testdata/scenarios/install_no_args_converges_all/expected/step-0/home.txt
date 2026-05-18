@@ -1,0 +1,17 @@
+.config [dir]
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/pkgA [dir]
+.config/easyrice/repos/default/pkgA/common [dir]
+.config/easyrice/repos/default/pkgA/common/a.conf [file]
+.config/easyrice/repos/default/pkgB [dir]
+.config/easyrice/repos/default/pkgB/common [dir]
+.config/easyrice/repos/default/pkgB/common/b.conf [file]
+.config/easyrice/repos/default/rice.toml [file]
+.config/pkgA [dir]
+.config/pkgA/a.conf -> <REPO>/pkgA/common/a.conf
+.config/pkgB [dir]
+.config/pkgB/b.conf -> <REPO>/pkgB/common/b.conf

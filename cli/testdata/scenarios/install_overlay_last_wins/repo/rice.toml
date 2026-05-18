@@ -1,0 +1,10 @@
+schema_version = 1
+
+[packages.demo]
+supported_os = ["linux", "darwin"]
+
+[packages.demo.profiles.default]
+sources = [
+  {path = "common", mode = "file", target = "$HOME/.config/demo"},
+  {path = "work",   mode = "file", target = "$HOME/.config/demo"},
+]

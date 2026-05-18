@@ -30,81 +30,18 @@ func writeDemoPkg(t *testing.T, repoRoot string) {
 	writeSourceFile(t, repoRoot, "demo/src/file2", "content2\n")
 }
 
-func TestE2E_Uninstall_HappyPath(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeDemoPkg(t, repoRoot)
-
-	out, err := runE2ECmd(t, "install", "demo", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install: %s", out)
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "demo", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall: %s", out)
-
-	assertNoSymlinkAt(t, filepath.Join(homeDir, ".config", "demo", "file1"))
-	assertNoSymlinkAt(t, filepath.Join(homeDir, ".config", "demo", "file2"))
-	assertStateMissingPackage(t, statePath, "demo")
-}
-
-func TestE2E_Uninstall_ManuallyDeletedSymlink_Skipped(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeDemoPkg(t, repoRoot)
-
-	out, err := runE2ECmd(t, "install", "demo", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install: %s", out)
-
-	link1 := filepath.Join(homeDir, ".config", "demo", "file1")
-	link2 := filepath.Join(homeDir, ".config", "demo", "file2")
-
-	manuallyDeleteSymlink(t, link1)
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "demo", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall: %s", out)
-
-	assertNoSymlinkAt(t, link1)
-	assertNoSymlinkAt(t, link2)
-	assertStateMissingPackage(t, statePath, "demo")
-}
-
-func TestE2E_Uninstall_SymlinkReplacedByRealFile(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeDemoPkg(t, repoRoot)
-
-	out, err := runE2ECmd(t, "install", "demo", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install: %s", out)
-
-	link1 := filepath.Join(homeDir, ".config", "demo", "file1")
-	link2 := filepath.Join(homeDir, ".config", "demo", "file2")
-
-	replaceSymlinkWithFile(t, link1, "user-data")
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "demo", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall: %s", out)
-
-	fi, err := os.Lstat(link1)
-	require.NoError(t, err, "real file should still exist at %s", link1)
-	assert.Equal(t, os.FileMode(0), fi.Mode()&os.ModeSymlink, "should not be a symlink")
-	contents, err := os.ReadFile(link1)
-	require.NoError(t, err)
-	assert.Equal(t, "user-data", string(contents))
-
-	assertNoSymlinkAt(t, link2)
-	assertStateMissingPackage(t, statePath, "demo")
-}
+// The following uninstall E2E tests have been migrated to YAML scenarios under
+// cli/testdata/scenarios/ (see scenarios_migrated_test.go for the inventory):
+//   - TestE2E_Uninstall_HappyPath                       -> uninstall_happy
+//   - TestE2E_Uninstall_ManuallyDeletedSymlink_Skipped  -> uninstall_manually_deleted
+//   - TestE2E_Uninstall_SymlinkReplacedByRealFile       -> uninstall_replaced_by_file
+//   - TestE2E_Uninstall_SymlinkReplacedByDirectory      -> uninstall_replaced_by_dir
+//   - TestE2E_Uninstall_FolderMode_ReplacedByDirectory  -> uninstall_folder_mode_replaced
+//   - TestE2E_Uninstall_PreservesOtherPackages          -> uninstall_preserves_others
+//
+// The tests below remain inline because they either inspect symlink targets
+// directly (foreign-symlink case) or assert single-step error semantics that
+// don't benefit from snapshot fixtures.
 
 func TestE2E_Uninstall_SymlinkReplacedByDifferentSymlink(t *testing.T) {
 	resetInstallFlags()
@@ -120,7 +57,6 @@ func TestE2E_Uninstall_SymlinkReplacedByDifferentSymlink(t *testing.T) {
 	link1 := filepath.Join(homeDir, ".config", "demo", "file1")
 	link2 := filepath.Join(homeDir, ".config", "demo", "file2")
 
-	// Create a foreign target outside the managed repo
 	foreignDir := t.TempDir()
 	foreignFile := filepath.Join(foreignDir, "foreign.txt")
 	require.NoError(t, os.WriteFile(foreignFile, []byte("foreign"), 0o644))
@@ -137,75 +73,6 @@ func TestE2E_Uninstall_SymlinkReplacedByDifferentSymlink(t *testing.T) {
 
 	assertNoSymlinkAt(t, link2)
 	assertStateMissingPackage(t, statePath, "demo")
-}
-
-func TestE2E_Uninstall_SymlinkReplacedByDirectory(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeDemoPkg(t, repoRoot)
-
-	out, err := runE2ECmd(t, "install", "demo", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install: %s", out)
-
-	link1 := filepath.Join(homeDir, ".config", "demo", "file1")
-	link2 := filepath.Join(homeDir, ".config", "demo", "file2")
-
-	replaceSymlinkWithDir(t, link1)
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "demo", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall: %s", out)
-
-	fi, err := os.Lstat(link1)
-	require.NoError(t, err)
-	assert.True(t, fi.IsDir(), "should still be a directory")
-
-	assertNoSymlinkAt(t, link2)
-	assertStateMissingPackage(t, statePath, "demo")
-}
-
-func TestE2E_Uninstall_FolderMode_ReplacedByDirectory(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeManifest(t, repoRoot, `schema_version = 1
-
-[packages.folderpkg]
-description = "Folder mode test"
-supported_os = ["linux", "darwin"]
-
-[packages.folderpkg.profiles.default]
-sources = [{path = "cfg", mode = "folder", target = "$HOME/.config/folderpkg"}]
-`)
-	writeSourceFile(t, repoRoot, "folderpkg/cfg/init.conf", "k=v\n")
-
-	out, err := runE2ECmd(t, "install", "folderpkg", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install: %s", out)
-
-	targetDir := filepath.Join(homeDir, ".config", "folderpkg")
-
-	require.NoError(t, os.Remove(targetDir))
-	require.NoError(t, os.MkdirAll(targetDir, 0o755))
-	innerFile := filepath.Join(targetDir, "user-file.conf")
-	require.NoError(t, os.WriteFile(innerFile, []byte("user content"), 0o644))
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "folderpkg", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall: %s", out)
-
-	fi, err := os.Lstat(targetDir)
-	require.NoError(t, err)
-	assert.True(t, fi.IsDir(), "directory should still exist")
-	contents, err := os.ReadFile(innerFile)
-	require.NoError(t, err)
-	assert.Equal(t, "user content", string(contents))
-
-	assertStateMissingPackage(t, statePath, "folderpkg")
 }
 
 func TestE2E_Uninstall_PackageNotInState_Error(t *testing.T) {
@@ -260,56 +127,4 @@ func TestE2E_Uninstall_StaleStateEntry(t *testing.T) {
 	require.NoError(t, err, "uninstall: %s", out)
 
 	assertStateMissingPackage(t, statePath, "demo")
-}
-
-func TestE2E_Uninstall_PreservesOtherPackages(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeManifest(t, repoRoot, `schema_version = 1
-
-[packages.pkgA]
-description = "Package A"
-supported_os = ["linux", "darwin"]
-
-[packages.pkgA.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/pkgA"}]
-
-[packages.pkgB]
-description = "Package B"
-supported_os = ["linux", "darwin"]
-
-[packages.pkgB.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/pkgB"}]
-`)
-	writeSourceFile(t, repoRoot, "pkgA/src/aconf", "a\n")
-	writeSourceFile(t, repoRoot, "pkgB/src/bconf", "b\n")
-
-	out, err := runE2ECmd(t, "install", "pkgA", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install pkgA: %s", out)
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "install", "pkgB", "--profile", "default", "--state", statePath, "--yes")
-	require.NoError(t, err, "install pkgB: %s", out)
-
-	linkA := filepath.Join(homeDir, ".config", "pkgA", "aconf")
-	linkB := filepath.Join(homeDir, ".config", "pkgB", "bconf")
-
-	_, err = os.Lstat(linkA)
-	require.NoError(t, err)
-	_, err = os.Lstat(linkB)
-	require.NoError(t, err)
-
-	resetInstallFlags()
-	out, err = runE2ECmd(t, "uninstall", "pkgA", "--state", statePath, "--yes")
-	require.NoError(t, err, "uninstall pkgA: %s", out)
-
-	assertNoSymlinkAt(t, linkA)
-	assertStateMissingPackage(t, statePath, "pkgA")
-
-	_, err = os.Lstat(linkB)
-	require.NoError(t, err, "pkgB symlink should still exist")
-	assertStateHasPackage(t, statePath, "pkgB", "default", 1)
 }

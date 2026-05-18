@@ -1,0 +1,22 @@
+{
+  "pkgA": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/pkgA/src/aconf",
+        "target": "<HOME>/.config/pkgA/aconf"
+      }
+    ],
+    "profile": "default"
+  },
+  "pkgB": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/pkgB/src/bconf",
+        "target": "<HOME>/.config/pkgB/bconf"
+      }
+    ],
+    "profile": "default"
+  }
+}

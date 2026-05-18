@@ -1,0 +1,13 @@
+{
+  "folderpkg": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "is_dir": true,
+        "source": "<REPO>/folderpkg/cfg",
+        "target": "<HOME>/.config/folderpkg"
+      }
+    ],
+    "profile": "default"
+  }
+}

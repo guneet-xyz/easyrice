@@ -1,0 +1,12 @@
+steps:
+  - name: "install with $HOME expansion in target"
+    args: ["install", "demo", "--profile", "default", "--skip-deps", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      home: "expected/step-0/home.txt"
+      repo: "expected/step-0/repo.txt"
+      state: "expected/step-0/state.txt"

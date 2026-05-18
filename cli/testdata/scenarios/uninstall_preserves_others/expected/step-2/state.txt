@@ -1,0 +1,12 @@
+{
+  "pkgB": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/pkgB/src/bconf",
+        "target": "<HOME>/.config/pkgB/bconf"
+      }
+    ],
+    "profile": "default"
+  }
+}

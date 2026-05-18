@@ -1,0 +1,12 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/demo/work/shared.conf",
+        "target": "<HOME>/.config/demo/shared.conf"
+      }
+    ],
+    "profile": "default"
+  }
+}

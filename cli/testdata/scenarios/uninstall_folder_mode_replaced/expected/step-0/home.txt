@@ -1,0 +1,11 @@
+.config [dir]
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/folderpkg [dir]
+.config/easyrice/repos/default/folderpkg/cfg [dir]
+.config/easyrice/repos/default/folderpkg/cfg/init.conf [file]
+.config/easyrice/repos/default/rice.toml [file]
+.config/folderpkg -> <REPO>/folderpkg/cfg

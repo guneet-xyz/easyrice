@@ -1,0 +1,39 @@
+steps:
+  - name: "install pkgA"
+    args: ["install", "pkgA", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "pkgA"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+
+  - name: "install pkgB"
+    args: ["install", "pkgB", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "pkgB"
+      home: "expected/step-1/home.txt"
+      state: "expected/step-1/state.txt"
+
+  - name: "uninstall pkgA preserves pkgB"
+    args: ["uninstall", "pkgA", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Uninstalled pkgA"
+      home: "expected/step-2/home.txt"
+      state: "expected/step-2/state.txt"

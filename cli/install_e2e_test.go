@@ -37,92 +37,16 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assertStateHasPackage(t, statePath, "demo", "default", 1)
 }
 
-// TestE2E_Install_DeepNestedTarget_CreatesDirs verifies installer auto-creates
-// arbitrarily deep parent directories on the target side.
-func TestE2E_Install_DeepNestedTarget_CreatesDirs(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
+// TestE2E_Install_DeepNestedTarget_CreatesDirs migrated to scenario
+// "install_deep_nested_target" (see scenarios_migrated_test.go).
 
-	writeManifest(t, repoRoot, `schema_version = 1
-[packages.demo]
-supported_os = ["linux", "darwin"]
-[packages.demo.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/a/b/c/d"}]
-`)
-	writeSourceFile(t, repoRoot, "demo/src/file", "deep\n")
+// TestE2E_Install_HomeExpansion migrated to scenario "install_home_expansion".
 
-	out, err := runE2ECmd(t, "--state", statePath, "--yes", "install", "demo",
-		"--profile", "default", "--skip-deps")
-	require.NoError(t, err, "install failed: %s", out)
+// TestE2E_Install_OverlayLastWins migrated to scenario "install_overlay_last_wins".
 
-	src := filepath.Join(repoRoot, "demo", "src", "file")
-	tgt := filepath.Join(homeDir, ".config", "a", "b", "c", "d", "file")
-	assertSymlinkPointsTo(t, tgt, src)
-	assertStateHasPackage(t, statePath, "demo", "default", 1)
-}
-
-// TestE2E_Install_HomeExpansion verifies $HOME in target is expanded via
-// os.ExpandEnv (not treated as a literal).
-func TestE2E_Install_HomeExpansion(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeManifest(t, repoRoot, `schema_version = 1
-[packages.demo]
-supported_os = ["linux", "darwin"]
-[packages.demo.profiles.default]
-sources = [{path = "src", mode = "file", target = "$HOME/.config/expand"}]
-`)
-	writeSourceFile(t, repoRoot, "demo/src/file", "expand\n")
-
-	out, err := runE2ECmd(t, "--state", statePath, "--yes", "install", "demo",
-		"--profile", "default", "--skip-deps")
-	require.NoError(t, err, "install failed: %s", out)
-
-	tgt := filepath.Join(homeDir, ".config", "expand", "file")
-	src := filepath.Join(repoRoot, "demo", "src", "file")
-	assertSymlinkPointsTo(t, tgt, src)
-	// And of course the literal "$HOME/..." path must NOT exist.
-	literal := filepath.Join(repoRoot, "$HOME", ".config", "expand", "file")
-	assertNoSymlinkAt(t, literal)
-}
-
-// TestE2E_Install_OverlayLastWins verifies that for file-mode sources sharing a
-// target subtree, later sources override earlier ones on identical relpaths.
-func TestE2E_Install_OverlayLastWins(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	writeManifest(t, repoRoot, `schema_version = 1
-[packages.demo]
-supported_os = ["linux", "darwin"]
-[packages.demo.profiles.default]
-sources = [
-  {path = "common", mode = "file", target = "$HOME/.config/demo"},
-  {path = "work",   mode = "file", target = "$HOME/.config/demo"},
-]
-`)
-	writeSourceFile(t, repoRoot, "demo/common/shared.conf", "common")
-	writeSourceFile(t, repoRoot, "demo/work/shared.conf", "work")
-
-	out, err := runE2ECmd(t, "--state", statePath, "--yes", "install", "demo",
-		"--profile", "default", "--skip-deps")
-	require.NoError(t, err, "install failed: %s", out)
-
-	want := filepath.Join(repoRoot, "demo", "work", "shared.conf")
-	tgt := filepath.Join(homeDir, ".config", "demo", "shared.conf")
-	assertSymlinkPointsTo(t, tgt, want)
-	assertStateHasPackage(t, statePath, "demo", "default", 1)
-}
-
-// TestE2E_Install_SourceWithSymlinkSkipped verifies that symlinks present
-// inside the source tree are skipped during walk (we manage real files only).
+// INLINE: planting an os.Symlink inside the source tree pre-install has no
+// equivalent scenario mutate op (replace_symlink requires a pre-existing link;
+// create_symlink does not exist).
 func TestE2E_Install_SourceWithSymlinkSkipped(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -152,8 +76,8 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assertStateHasPackage(t, statePath, "demo", "default", 1)
 }
 
-// TestE2E_Install_EmptySourceDir_Success verifies that an empty source dir is
-// a valid no-link install (no error, 0 links).
+// INLINE: empty source directory cannot be checked into testdata seeds (git
+// drops empty dirs); a single mkdir + zero-link assertion stays clearer here.
 func TestE2E_Install_EmptySourceDir_Success(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -176,8 +100,8 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assertStateHasPackage(t, statePath, "demo", "default", 0)
 }
 
-// TestE2E_Install_UnsupportedOS_Error verifies the OS-gate refuses a package
-// declared as only-windows when running on linux/darwin.
+// INLINE: error-case test - asserts on error string ("does not support") and
+// state-file absence; scenario format prefers snapshotable outcomes.
 func TestE2E_Install_UnsupportedOS_Error(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -204,8 +128,7 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	}
 }
 
-// TestE2E_Install_PackageNotDeclared_Error verifies referencing an unknown
-// package name yields a clear error.
+// INLINE: error-case test - asserts on error string ("nonexistent" / "not declared").
 func TestE2E_Install_PackageNotDeclared_Error(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -228,8 +151,7 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assert.Contains(t, combined, "not declared")
 }
 
-// TestE2E_Install_ProfileNotDeclared_Error verifies a missing profile name
-// produces an error.
+// INLINE: error-case test - asserts on error string ("badprofile").
 func TestE2E_Install_ProfileNotDeclared_Error(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -251,8 +173,7 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assert.Contains(t, combined, "badprofile")
 }
 
-// TestE2E_Install_SourceDirMissing_Error verifies a manifest pointing at a
-// non-existent source path is rejected with a descriptive error.
+// INLINE: error-case test - missing source dir, asserts on error string.
 func TestE2E_Install_SourceDirMissing_Error(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -274,8 +195,8 @@ sources = [{path = "missing", mode = "file", target = "$HOME/.config/demo"}]
 	assert.Contains(t, combined, "missing")
 }
 
-// TestE2E_Install_TargetEscapesHome_Refused verifies the withinHome guard
-// rejects absolute targets outside the isolated $HOME.
+// INLINE: deliberately targets a path OUTSIDE the home/repo sandbox to
+// exercise withinHome; scenario containment guard would refuse the assertion.
 func TestE2E_Install_TargetEscapesHome_Refused(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -302,44 +223,10 @@ sources = [{path = "common", mode = "file", target = "/tmp/easyrice-outside-test
 	assertNoSymlinkAt(t, filepath.Join(escapeDir, "file"))
 }
 
-// TestE2E_Install_NoArgs_ConvergesAll verifies `rice install` with no positional
-// argument converges every declared package.
-func TestE2E_Install_NoArgs_ConvergesAll(t *testing.T) {
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-	repoRoot, _, homeDir := setupE2ERepo(t)
-	statePath := filepath.Join(t.TempDir(), "state.json")
+// TestE2E_Install_NoArgs_ConvergesAll migrated to scenario "install_no_args_converges_all".
 
-	writeManifest(t, repoRoot, `schema_version = 1
-[packages.pkgA]
-supported_os = ["linux", "darwin"]
-[packages.pkgA.profiles.default]
-sources = [{path = "common", mode = "file", target = "$HOME/.config/pkgA"}]
-
-[packages.pkgB]
-supported_os = ["linux", "darwin"]
-[packages.pkgB.profiles.default]
-sources = [{path = "common", mode = "file", target = "$HOME/.config/pkgB"}]
-`)
-	writeSourceFile(t, repoRoot, "pkgA/common/a.conf", "a\n")
-	writeSourceFile(t, repoRoot, "pkgB/common/b.conf", "b\n")
-
-	out, err := runE2ECmd(t, "--state", statePath, "--yes", "install",
-		"--profile", "default", "--skip-deps")
-	require.NoError(t, err, "install failed: %s", out)
-
-	assertSymlinkPointsTo(t,
-		filepath.Join(homeDir, ".config", "pkgA", "a.conf"),
-		filepath.Join(repoRoot, "pkgA", "common", "a.conf"))
-	assertSymlinkPointsTo(t,
-		filepath.Join(homeDir, ".config", "pkgB", "b.conf"),
-		filepath.Join(repoRoot, "pkgB", "common", "b.conf"))
-	assertStateHasPackage(t, statePath, "pkgA", "default", 1)
-	assertStateHasPackage(t, statePath, "pkgB", "default", 1)
-}
-
-// TestE2E_Install_MalformedManifest_Error verifies syntactically broken TOML
-// produces an error before any work is done.
+// INLINE: error-case test - asserts on parse/invalid manifest error variants
+// and state-file absence.
 func TestE2E_Install_MalformedManifest_Error(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -362,8 +249,9 @@ func TestE2E_Install_MalformedManifest_Error(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "state file should not be created on manifest parse error")
 }
 
-// TestE2E_Install_StateFileMissing_CreatedFresh verifies the installer creates
-// the state file on first install when it doesn't yet exist.
+// INLINE: --state points at a nested tempdir path outside the home sandbox to
+// verify on-the-fly state-file creation; scenario expect.state captures from a
+// single canonical path.
 func TestE2E_Install_StateFileMissing_CreatedFresh(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
@@ -388,8 +276,8 @@ sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]
 	assertStateHasPackage(t, statePath, "demo", "default", 1)
 }
 
-// TestE2E_Install_StateFileCorrupted_Errors verifies install fails fast (and
-// leaves the corrupted state file untouched) when state.json is unreadable.
+// INLINE: byte-equality assertion on the corrupted state file (untouched on
+// failure) does not map cleanly to scenario state-snapshot diffing.
 func TestE2E_Install_StateFileCorrupted_Errors(t *testing.T) {
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)

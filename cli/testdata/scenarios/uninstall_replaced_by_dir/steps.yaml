@@ -1,0 +1,32 @@
+steps:
+  - name: "install demo"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+
+  - name: "uninstall demo after file1 replaced by directory"
+    args: ["uninstall", "demo", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    mutate:
+      - op: remove
+        path: "<HOME>/.config/demo/file1"
+      - op: mkdir
+        path: "<HOME>/.config/demo/file1"
+        mode: "0755"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Uninstalled demo"
+      home: "expected/step-1/home.txt"
+      state: "expected/step-1/state.txt"

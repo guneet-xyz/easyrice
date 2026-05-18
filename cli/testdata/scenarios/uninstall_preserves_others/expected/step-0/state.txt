@@ -1,0 +1,12 @@
+{
+  "pkgA": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/pkgA/src/aconf",
+        "target": "<HOME>/.config/pkgA/aconf"
+      }
+    ],
+    "profile": "default"
+  }
+}

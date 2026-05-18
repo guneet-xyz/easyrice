@@ -1,0 +1,35 @@
+steps:
+  - name: "install folderpkg (folder mode)"
+    args: ["install", "folderpkg", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "folderpkg"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+
+  - name: "uninstall folderpkg after target replaced by real directory"
+    args: ["uninstall", "folderpkg", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    mutate:
+      - op: remove
+        path: "<HOME>/.config/folderpkg"
+      - op: mkdir
+        path: "<HOME>/.config/folderpkg"
+        mode: "0755"
+      - op: write_file
+        path: "<HOME>/.config/folderpkg/user-file.conf"
+        content: "user content"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Uninstalled folderpkg"
+      home: "expected/step-1/home.txt"
+      state: "expected/step-1/state.txt"

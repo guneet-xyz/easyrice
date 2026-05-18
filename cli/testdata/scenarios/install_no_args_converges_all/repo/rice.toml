@@ -1,0 +1,13 @@
+schema_version = 1
+
+[packages.pkgA]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgA.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/pkgA"}]
+
+[packages.pkgB]
+supported_os = ["linux", "darwin"]
+
+[packages.pkgB.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/pkgB"}]

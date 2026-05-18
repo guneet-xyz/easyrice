@@ -1,0 +1,12 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/demo/src/file",
+        "target": "<HOME>/.config/expand/file"
+      }
+    ],
+    "profile": "default"
+  }
+}
