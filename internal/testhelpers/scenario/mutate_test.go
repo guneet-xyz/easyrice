@@ -14,9 +14,9 @@ func TestApplyMutate_AllOps(t *testing.T) {
 	repo := t.TempDir()
 
 	tests := []struct {
-		name string
-		op   MutateOp
-		prep func(t *testing.T)
+		name   string
+		op     MutateOp
+		prep   func(t *testing.T)
 		verify func(t *testing.T)
 	}{
 		{
@@ -218,8 +218,8 @@ func TestApplyMutate_RejectExternalPath(t *testing.T) {
 	repo := t.TempDir()
 
 	op := MutateOp{
-		Op:   "write_file",
-		Path: "/etc/passwd",
+		Op:      "write_file",
+		Path:    "/etc/passwd",
 		Content: "malicious",
 	}
 

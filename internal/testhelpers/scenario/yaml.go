@@ -27,10 +27,10 @@ func LoadScenario(scenarioDir string) (*Scenario, error) {
 	var rawScenario struct {
 		Mocks []string `yaml:"mocks"`
 		Steps []struct {
-			Name   string                 `yaml:"name"`
-			Args   []string               `yaml:"args"`
-			Stdin  string                 `yaml:"stdin"`
-			Env    map[string]string      `yaml:"env"`
+			Name   string                   `yaml:"name"`
+			Args   []string                 `yaml:"args"`
+			Stdin  string                   `yaml:"stdin"`
+			Env    map[string]string        `yaml:"env"`
 			Mutate []map[string]interface{} `yaml:"mutate"`
 			Expect struct {
 				ExitCode          int      `yaml:"exit_code"`
@@ -64,11 +64,11 @@ func LoadScenario(scenarioDir string) (*Scenario, error) {
 		// Parse and validate mutate ops
 		mutateOps := make([]MutateOp, len(rawStep.Mutate))
 		validOps := map[string]bool{
-			"remove":           true,
-			"write_file":       true,
-			"replace_symlink":  true,
-			"mkdir":            true,
-			"chmod":            true,
+			"remove":          true,
+			"write_file":      true,
+			"replace_symlink": true,
+			"mkdir":           true,
+			"chmod":           true,
 		}
 
 		for j, rawOp := range rawStep.Mutate {
@@ -96,7 +96,7 @@ func LoadScenario(scenarioDir string) (*Scenario, error) {
 				case string:
 					// Try to parse as octal
 					var m int
-					fmt.Sscanf(v, "%o", &m)
+					_, _ = fmt.Sscanf(v, "%o", &m)
 					mode = os.FileMode(m)
 				}
 			}

@@ -29,7 +29,7 @@ easyrice/
 │   ├── doctor/      # health checks (legacy state detection)
 │   ├── updater/     # self-update: GitHub release polling + binary swap (see internal/updater/AGENTS.md)
 │   └── prompt/      # RenderPlan, RenderConflicts, Confirm
-├── testdata/        # fixtures (testdata/manifest_valid_v2, testdata/manifest_invalid_v2, testdata/install_v2)
+├── testdata/        # KEEP: manifest_with_import/, remote_rice/ (referenced by converge integration tests)
 ├── Makefile         # build / install / test / vet / fmt / clean
 ├── go.mod
 └── AGENTS.md        # this file
@@ -277,7 +277,7 @@ make fmt
 
 - ALWAYS `go test -race ./...` (Makefile already enforces).
 - Table-driven default: `for _, tc := range cases { t.Run(tc.name, ...) }`.
-- Fixtures live under `testdata/<scenario>/rice.toml` for v2 (single-file) layout. `testdata/` is ignored by Go toolchain.
+- CLI e2e scenario fixtures live under `cli/testdata/scenarios/<name>/` (each with `steps.yaml`, `repo/`, `expected/`). Unit test fixtures use inline `t.TempDir()` builders. The top-level `testdata/` directory contains only `manifest_with_import/` and `remote_rice/` which are still referenced by converge integration tests.
 - Pass `--state` to a temp file in tests; never the real default path.
 - For tests that need a managed repo, point at a `t.TempDir()` (the `repo` package functions accept the path explicitly).
 - Use `t.Helper()` on test helpers; `t.TempDir()` auto-cleans.
