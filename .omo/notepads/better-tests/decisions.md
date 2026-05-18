@@ -48,3 +48,31 @@ Placeholder `BUG-000` is present and must be removed before Task 18 is marked co
 - Internal unexported field `fetcher` retypes from `releaseFetcher` to `ReleaseFetcher` (the exported alias) so existing test assignments (`u.fetcher = fakeFetcher`) keep compiling.
 - `cache.go` swaps the single `time.Now()` call for `u.opts.Clock.Now()`.
 - `swap.go` swaps `acquireLock(u.opts.CacheDir)` for `u.opts.Locker.Acquire(u.opts.CacheDir)` and wraps the deferred release in `func() { _ = releaseLock() }` to discard the new error return.
+
+## [2026-05-18T17:34:10Z] Task 11: concurrency synchronization pattern
+
+For all future concurrency-bug tests use the pure-Go start-barrier idiom — no external deps, no sleeps:
+
+```go
+start := make(chan struct{})
+var wg sync.WaitGroup
+for i := 0; i < N; i++ {
+    wg.Add(1)
+    go func(i int) {
+        defer wg.Done()
+        <-start
+        // work
+    }(i)
+}
+close(start) // simultaneous release
+wg.Wait()
+```
+
+Rejected `golang.org/x/sync/errgroup`: not in go.mod, would have been a new production dep. Per-goroutine error collection via `errs := make([]error, N)` indexed by goroutine id is sufficient for invariant-based assertion.
+
+Failure detector across every concurrency test = `assertStateInvariant(t, statePath)`:
+1. state.json must parse.
+2. Every InstalledLink target must be a symlink to its declared source.
+3. (test-specific) set of packages in state ↔ set of packages with links on disk.
+
+This invariant catches BOTH torn writes (parse fails) AND lost-update (entry missing) AND incoherent state (link exists without entry, or vice versa). It is the universal post-condition.

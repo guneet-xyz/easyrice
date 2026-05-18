@@ -168,3 +168,19 @@ The fix path (future Fix task): change `internal/profile/profile.go:33-35` to bu
 
 The multiremote builder DOES execute `git submodule add file://...` per remote, so the on-disk layout is realistic (the parent has `remotes/<name>/rice.toml` as a real submodule checkout). `ResolveSpecs` only reads via `repo.RemoteTomlPath(parentRoot, name)`, so this works.
 
+
+## [2026-05-18T17:34:10Z] Task 11: concurrency — confirmed real production races
+
+Real bugs surfaced by `go test -race -count=5 -run TestInstaller_Concurrency`:
+
+- **BUG-063 (deterministic, every run)**: `state.Save` is *Load → in-memory mutate → WriteFile*; no synchronization. 8 disjoint installs reliably reduce to ~1 entry. The "last-writer-wins" pattern is exactly the predicted BUG-007 territory.
+- **BUG-065 (deterministic, every run)**: `os.WriteFile` truncates THEN writes; a concurrent `state.Load` sees an empty file and json.Unmarshal returns "unexpected end of JSON input". `BuildConvergePlan` is supposed to be read-only-safe but cannot survive an in-flight writer.
+- **BUG-061 (intermittent)**: under contention `os.WriteFile`'s two-step truncate-then-write can leave bytes from a previous payload past the new payload's end → "invalid character 'C' after top-level value" (a torn write, not just last-writer-wins). This is more severe than BUG-063 because the FILE itself is invalid JSON, not just missing entries.
+- **BUG-060 (intermittent)**: ConvergeAll iterates the manifest's `map[string]PackageDef`; map iteration order is non-deterministic, so the goroutine that wins state.Save varies — sometimes losing a package even though it was installed.
+- **BUG-062, BUG-064**: did not reproduce in this run. State payload here is small (<2KB) so `os.WriteFile` fits in a single syscall on Linux ext4; on slower disks or larger states these will surface. Kept as guards.
+
+Synchronization pattern that worked: `chan struct{} start barrier + sync.WaitGroup`. No sleeps. Goroutines block on `<-start` then `close(start)` releases all at once. Determinism over `-count=5` is excellent for BUG-063/065; the others are 30-80% per run.
+
+No race detector hits in test code — only production races, as intended.
+
+The fix (out of scope for tests-only T11) is straightforward: `state.Save` must (a) write to a temp file in the same directory, (b) `os.Rename` to the final path (atomic on POSIX), (c) hold a file lock around Load+mutate+Save sequences. The temp+rename pattern alone fixes BUG-061/065 immediately; the lock fixes BUG-060/063.

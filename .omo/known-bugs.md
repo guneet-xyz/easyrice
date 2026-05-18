@@ -155,6 +155,72 @@ Every entry follows this exact template. Copy it verbatim when adding a new entr
 **Repro**: `go test -race -count=1 -run TestProfile_CircularImports/BUG-049 -v ./internal/profile/...`
 **How we know test is correct**: AGENTS.md mandates file-mode last-wins; spec list ORDER is the contract that drives the overlay walk.
 
+## BUG-060 — Concurrent ConvergeAll loses state entries
+**Status**: failing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_060_ConcurrentConvergeAll
+**Spec source**: AGENTS.md "State File" (single source of truth for uninstall) + `.omo/plans/better-tests.md` line 1206
+**Expected**: 8 goroutines running ConvergeAll against the same managed repo produce a state.json that contains all packages and a disk state that matches.
+**Actual**: Some packages are missing from state.json even though their links exist on disk; `state.Load → mutate → state.Save` is non-atomic, so the last writer overwrites concurrent additions.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_060 ./internal/installer/...`
+**How we know test is correct**: Two `rice install` invocations in two shells is a documented user workflow; data loss across the boundary is by definition a bug, not by design.
+
+## BUG-061 — Concurrent Install with conflicting profiles tears state
+**Status**: failing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_061_ConflictingProfiles
+**Spec source**: `.omo/plans/better-tests.md` line 1207
+**Expected**: Two concurrent `Install(zsh, profile=a)` and `Install(zsh, profile=b)` calls leave state.json with exactly one profile recorded AND with the on-disk links matching that profile's sources.
+**Actual**: state.json may end up syntactically invalid (`invalid character 'C' after top-level value`) — i.e., a torn write where two `os.WriteFile` calls' payloads interleave on disk.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_061 ./internal/installer/...`
+**How we know test is correct**: `state.Save` is documented to fully replace the file; partial bytes are a clear write-atomicity violation that breaks every subsequent rice command.
+
+## BUG-062 — Install/Uninstall race leaves a partial package
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_062_InstallVsUninstall
+**Spec source**: `.omo/plans/better-tests.md` line 1208
+**Expected**: After concurrent `Install` and `Uninstall` of the same package the final state is either fully installed (state entry present, links exist) or fully uninstalled (no state entry, no orphan links).
+**Actual**: No partial state observed in current runs; kept as a regression guard.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_062 ./internal/installer/...`
+**How we know test is correct**: The assertStateInvariant helper directly checks the link↔source pointer for every recorded link, so any divergence is caught.
+
+## BUG-063 — Last-writer-wins drops disjoint-package installs
+**Status**: failing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_063_DistinctPackagesAllSurvive
+**Spec source**: `.omo/plans/better-tests.md` line 1209
+**Expected**: 8 parallel installs of 8 distinct packages with non-overlapping targets produce 8 state entries.
+**Actual**: Most packages are silently dropped — `state.Save` rewrites the file with the snapshot the saving goroutine loaded, overwriting peers' concurrent additions.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_063 ./internal/installer/...`
+**How we know test is correct**: With disjoint targets there is no semantic conflict; the only way entries can vanish is non-atomic state.Save.
+
+## BUG-064 — Rapid state.Save replacement leaves stale partial JSON
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_064_RapidSaveReplacement
+**Spec source**: `.omo/plans/better-tests.md` line 1210
+**Expected**: When two goroutines call state.Save rapidly, the final file is one of the saved payloads in full — never interleaved/truncated JSON.
+**Actual**: Not reproduced in current runs (payload here is small enough for `os.WriteFile` to fit in one system write); kept as a regression guard for larger states.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_064 ./internal/installer/...`
+**How we know test is correct**: state.Load failures from torn writes would surface as JSON parse errors, which the test reports as failure.
+
+## BUG-065 — BuildConvergePlan reads torn state.json mid-write
+**Status**: failing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/concurrency_test.go:TestInstaller_Concurrency/BUG_065_PlanReadDuringExecuteWrite
+**Spec source**: `.omo/plans/better-tests.md` line 1211
+**Expected**: BuildConvergePlan (documented read-only) must tolerate a concurrent ExecuteConvergePlan writer and always observe a parseable, consistent state.json.
+**Actual**: `BuildConvergePlan` returns `load state: unexpected end of JSON input` whenever it reads while `state.Save` is mid-write — `os.WriteFile` truncates then writes, exposing an empty/partial file to readers.
+**Repro**: `go test -race -count=5 -run TestInstaller_Concurrency/BUG_065 ./internal/installer/...`
+**How we know test is correct**: AGENTS.md and the installer doc both promise read-only callers (status, plan) can run concurrently with mutators; visible torn reads break that contract.
+
 ## BUG-000 — Example — remove before completing Task 18
 **Status**: failing
 **Severity**: S3
@@ -165,6 +231,161 @@ Every entry follows this exact template. Copy it verbatim when adding a new entr
 **Actual**: Placeholder still present, demonstrating the template format.
 **Repro**: No test exists; this entry is illustrative only.
 **How we know test is correct**: N/A, this row is a format demonstration and is deleted once real entries land.
+
+## BUG-066 — Partial install rollback durability
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-066-PartialRollback
+**Spec source**: `.omo/plans/better-tests.md` line 1303 (Task 12)
+**Expected**: When symlink op 5 fails, state.json records exactly the 4 successful links and exactly 4 symlinks exist on disk; no 5th+ link.
+**Actual**: `ExecuteInstallPlan`'s `saveAndReturn` already persists the partial `created` list before propagating the error — verified by this regression test.
+**Repro**: `go test -race -count=3 -run TestInstaller_Edges/BUG-066-PartialRollback ./internal/installer/...`
+**How we know test is correct**: `fsfault.WithSymlink_FailAfterN(t, &installerSymlink, 4)` deterministically succeeds 4 times then errors; state load asserts `len(InstalledLinks)==4` and `filepath.WalkDir` counts exactly 4 symlinks under HOME.
+
+## BUG-067 — withinHome bypass: absolute /etc/passwd target rejected
+**Status**: passing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-067-TargetOutsideHome
+**Spec source**: `.omo/plans/better-tests.md` line 1304 (Task 12); AGENTS.md "withinHome"
+**Expected**: `BuildInstallPlan` rejects `target="/etc/passwd"` before any FS op.
+**Actual**: `withinHome` returns false; error message includes "escapes home directory" — the test accepts either "outside" or "escapes home" wording.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-067 ./internal/installer/...`
+**How we know test is correct**: Asserts both an error AND that the message names the boundary violation.
+
+## BUG-068 — withinHome with symlinked $HOME
+**Status**: passing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-068-SymlinkedHomeBoundary
+**Spec source**: `.omo/plans/better-tests.md` line 1305 (Task 12)
+**Expected**: Target traversing `..` through a symlinked HOME is rejected.
+**Actual**: `filepath.Rel(absHome, absTarget)` returns a `..`-prefixed path, so withinHome rejects.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-068 ./internal/installer/...`
+**How we know test is correct**: Sets up real/fake home with `os.Symlink`, points the spec target through `fakeHome/../escape`, asserts `BuildInstallPlan` errors.
+
+## BUG-069 — withinHome with ".." in target
+**Status**: passing
+**Severity**: S1
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-069-DotDotInTarget
+**Spec source**: `.omo/plans/better-tests.md` line 1306 (Task 12)
+**Expected**: `target="$HOME/../etc"` rejected after expansion + cleaning.
+**Actual**: `withinHome` applies `filepath.Abs` then `filepath.Rel`; result begins with `..`, rejected.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-069 ./internal/installer/...`
+**How we know test is correct**: Asserts an error on `$HOME/../etc` after `os.ExpandEnv`.
+
+## BUG-070 — file+folder mode collision on overlapping subtree
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-070-FileFolderCollision
+**Spec source**: `.omo/plans/better-tests.md` line 1307 (Task 12); AGENTS.md "Source modes"
+**Expected**: BuildInstallPlan rejects when a folder-mode source and another source share a target subtree.
+**Actual**: The overlay validation loop in `install.go` emits "sources … both target overlapping paths …".
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-070 ./internal/installer/...`
+**How we know test is correct**: Two sources on the same target; one folder, one file → asserts error containing "overlap" or "folder".
+
+## BUG-071 — File-mode overlay last-wins
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-071-OverlayLastWins
+**Spec source**: `.omo/plans/better-tests.md` line 1308 (Task 12); AGENTS.md "Source modes"
+**Expected**: With sources A, B, C all writing the same target relative path, the resulting symlink points into source C.
+**Actual**: `indexByTarget` overwrite preserves the C source's absolute path.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-071 ./internal/installer/...`
+**How we know test is correct**: After install, `os.Readlink` is read directly and compared to the expected absolute path under source C; goldenfs `Snapshot` confirms the overlay link exists under HOME.
+
+## BUG-072 — Folder-mode is NOT overlayable
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-072-FolderModeDoubleTarget
+**Spec source**: `.omo/plans/better-tests.md` line 1309 (Task 12)
+**Expected**: Two folder-mode sources pointing at the same target → rejected at plan time.
+**Actual**: Folder overlay validation in `install.go` flags the collision.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-072 ./internal/installer/...`
+**How we know test is correct**: Builds a fixture with two folder sources sharing one target; asserts `BuildInstallPlan` errors.
+
+## BUG-073 — Idempotency: ConvergeAll twice preserves installed_at
+**Status**: passing
+**Severity**: S2
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-073-Idempotent
+**Spec source**: `.omo/plans/better-tests.md` line 1310 (Task 12)
+**Expected**: Second ConvergeAll is a no-op; `installed_at` byte-equal to first run.
+**Actual**: When the package is already converged, `BuildConvergePlan` returns `OutcomeNoOp` and `ExecuteConvergePlan` returns early without re-stamping state.
+**Repro**: `go test -race -count=3 -run TestInstaller_Edges/BUG-073 ./internal/installer/...`
+**How we know test is correct**: Reads state.json before and after the second converge and compares `InstalledAt` with `require.Equal`.
+
+## BUG-074 — Profile-switch must preserve installed_at
+**Status**: failing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-074-ProfileSwitchPreservesInstalledAt
+**Spec source**: `.omo/plans/better-tests.md` line 1311 (Task 12)
+**Expected**: After switching profile A → B, `installed_at` equals the initial install timestamp.
+**Actual**: `ExecuteInstallPlan` unconditionally writes `InstalledAt: time.Now()`, so profile switch advances the timestamp.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-074 ./internal/installer/...`
+**How we know test is correct**: Loads state immediately after first install (capturing `beforeAt`), executes profile-switch converge, reloads state, asserts `require.Equal(beforeAt, after.InstalledAt)`.
+
+## BUG-075 — Repair must preserve installed_at
+**Status**: failing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-075-RepairPreservesInstalledAt
+**Spec source**: `.omo/plans/better-tests.md` line 1312 (Task 12)
+**Expected**: Repair re-creates a missing symlink without modifying `installed_at`.
+**Actual**: `OutcomeRepaired` flows through `Install` which writes `time.Now()`.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-075 ./internal/installer/...`
+**How we know test is correct**: Removes one symlink, converges again, compares stored `InstalledAt` against the value captured before drift.
+
+## BUG-076 — Uninstall of not-installed package
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-076-UninstallNotInstalled
+**Spec source**: `.omo/plans/better-tests.md` line 1313 (Task 12)
+**Expected**: Error `package %q not installed`; non-zero exit (mapped from error).
+**Actual**: `BuildUninstallPlan` returns the canonical error string.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-076 ./internal/installer/...`
+**How we know test is correct**: Calls `Uninstall` with an empty state path; asserts the error contains "not installed".
+
+## BUG-077 — Install with non-existent profile lists available
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-077-UnknownProfile
+**Spec source**: `.omo/plans/better-tests.md` line 1314 (Task 12)
+**Expected**: Error names the unknown profile and at least one available profile.
+**Actual**: Currently the failure path in `BuildConvergePlan` flows through `profile.ResolveSpecs` which surfaces the unknown profile name; the available profile leaks through via the wrap when no stored profile exists.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-077 ./internal/installer/...`
+**How we know test is correct**: Asserts error AND that the message names a known profile ("default").
+
+## BUG-078 — Install of undeclared package
+**Status**: passing
+**Severity**: S3
+**Package**: internal/installer
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-078-UndeclaredPackage
+**Spec source**: `.omo/plans/better-tests.md` line 1315 (Task 12)
+**Expected**: Error references the undeclared package; CLI maps this to a hint about `rice status`.
+**Actual**: At the installer layer, a nil `Pkg` returns "install request: Pkg must not be nil for package …" which is the lower-half of the discovery path used by CLI.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-078 ./internal/installer/...`
+**How we know test is correct**: Asserts `BuildConvergePlan` errors and the message is non-empty (CLI is the layer that adds the `rice status` hint; the installer layer is covered here).
+
+## BUG-079 — Empty `[packages.x.profiles]` rejected by manifest validation
+**Status**: passing
+**Severity**: S2
+**Package**: internal/manifest
+**Test**: internal/installer/edges_test.go:TestInstaller_Edges/BUG-079-EmptyProfilesRejected
+**Spec source**: `.omo/plans/better-tests.md` line 1316 (Task 12); cross-ref BUG-026
+**Expected**: `Validate` rejects a package whose `profiles` map is empty.
+**Actual**: `validate.go` emits `"package %q: at least one profile must be defined"`.
+**Repro**: `go test -race -count=1 -run TestInstaller_Edges/BUG-079 ./internal/installer/...`
+**How we know test is correct**: Constructs a `*Manifest` with one package and zero profiles; asserts `Validate` returns an error mentioning "profile".
+
 
 ## Verification
 

@@ -1,0 +1,45 @@
+=== RUN   TestInstaller_Concurrency_StateInvariant
+    concurrency_test.go:504: invariant: package "apkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "cpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "dpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "epkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "gpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "hpkg" has on-disk link but no state entry
+--- FAIL: TestInstaller_Concurrency_StateInvariant (0.01s)
+=== RUN   TestInstaller_Concurrency_StateInvariant
+    concurrency_test.go:504: invariant: package "bpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "cpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "dpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "epkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "gpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "hpkg" has on-disk link but no state entry
+--- FAIL: TestInstaller_Concurrency_StateInvariant (0.01s)
+=== RUN   TestInstaller_Concurrency_StateInvariant
+    concurrency_test.go:504: invariant: package "apkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "bpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "cpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "epkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "fpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "hpkg" has on-disk link but no state entry
+--- FAIL: TestInstaller_Concurrency_StateInvariant (0.01s)
+=== RUN   TestInstaller_Concurrency_StateInvariant
+    concurrency_test.go:504: invariant: package "apkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "bpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "cpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "dpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "fpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "gpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "hpkg" has on-disk link but no state entry
+--- FAIL: TestInstaller_Concurrency_StateInvariant (0.01s)
+=== RUN   TestInstaller_Concurrency_StateInvariant
+    concurrency_test.go:504: invariant: package "apkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "bpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "cpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "dpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "fpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "gpkg" has on-disk link but no state entry
+    concurrency_test.go:504: invariant: package "hpkg" has on-disk link but no state entry
+--- FAIL: TestInstaller_Concurrency_StateInvariant (0.01s)
+FAIL
+FAIL	github.com/guneet-xyz/easyrice/internal/installer	0.061s
+FAIL
