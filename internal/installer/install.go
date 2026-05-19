@@ -114,6 +114,9 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 		} else {
 			sourceDir = filepath.Join(req.RepoRoot, packageRoot, spec.Path)
 		}
+		if lfi, lerr := os.Lstat(sourceDir); lerr == nil && lfi.Mode()&os.ModeSymlink != 0 {
+			return nil, fmt.Errorf("source %q is a symlink; source path must be a real directory, not a symlink", sourceDir)
+		}
 		fi, err := os.Stat(sourceDir)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -254,7 +257,7 @@ func BuildInstallPlan(req InstallRequest) (*plan.Plan, error) {
 	}
 
 	if len(conflicts) > 0 {
-		return p, fmt.Errorf("conflicts detected: %d", len(conflicts))
+		return p, fmt.Errorf("conflicts detected: %d (%s: %s)", len(conflicts), conflicts[0].Target, conflicts[0].Reason)
 	}
 
 	logger.Debug("install plan built", zap.Int("ops", len(p.Ops)))
@@ -270,7 +273,9 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 		zap.Int("ops", len(p.Ops)),
 	)
 
-	// Load existing state
+	unlock := state.Lock(statePath)
+	defer unlock()
+
 	st, err := state.Load(statePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load state: %w", err)
@@ -280,11 +285,16 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 
 	saveAndReturn := func(execErr error) (*InstallResult, error) {
 		// InstalledDependencies is populated by installer.EnsureDependencies before plan execution; preserve it here.
+		// InstalledAt is preserved across re-installs (profile-switch / repair) so users keep the first-install timestamp.
 		existing := st[p.PackageName]
+		installedAt := existing.InstalledAt
+		if installedAt.IsZero() {
+			installedAt = time.Now()
+		}
 		st[p.PackageName] = state.PackageState{
 			Profile:               p.Profile,
 			InstalledLinks:        created,
-			InstalledAt:           time.Now(),
+			InstalledAt:           installedAt,
 			InstalledDependencies: existing.InstalledDependencies,
 		}
 		if saveErr := state.Save(statePath, st); saveErr != nil {
@@ -330,10 +340,14 @@ func ExecuteInstallPlan(p *plan.Plan, statePath string) (*InstallResult, error) 
 	// Success: save full state
 	// InstalledDependencies is populated by installer.EnsureDependencies before plan execution; preserve it here.
 	existing := st[p.PackageName]
+	installedAt := existing.InstalledAt
+	if installedAt.IsZero() {
+		installedAt = time.Now()
+	}
 	st[p.PackageName] = state.PackageState{
 		Profile:               p.Profile,
 		InstalledLinks:        created,
-		InstalledAt:           time.Now(),
+		InstalledAt:           installedAt,
 		InstalledDependencies: existing.InstalledDependencies,
 	}
 	if err := state.Save(statePath, st); err != nil {

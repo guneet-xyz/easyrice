@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/guneet-xyz/easyrice/internal/manifest"
 	"github.com/guneet-xyz/easyrice/internal/plan"
@@ -50,6 +51,9 @@ func BuildConvergePlan(req ConvergeRequest) (*ConvergeResult, error) {
 	if req.Pkg == nil {
 		return nil, fmt.Errorf("converge request: Pkg must not be nil for package %q", req.PackageName)
 	}
+
+	unlock := state.Lock(req.StatePath)
+	defer unlock()
 
 	st, err := state.Load(req.StatePath)
 	if err != nil {
@@ -198,6 +202,7 @@ func ExecuteConvergePlan(req ConvergeRequest, cr *ConvergeResult) error {
 
 	switch cr.Outcome {
 	case OutcomeProfileSwitched:
+		preserveInstalledAt, _ := loadInstalledAt(req.StatePath, req.PackageName)
 		uninstallPlan, err := BuildUninstallPlan(UninstallRequest{
 			PackageName: req.PackageName,
 			StatePath:   req.StatePath,
@@ -208,9 +213,11 @@ func ExecuteConvergePlan(req ConvergeRequest, cr *ConvergeResult) error {
 		if err := ExecuteUninstallPlan(uninstallPlan, req.StatePath); err != nil {
 			return fmt.Errorf("execute uninstall: %w", err)
 		}
+		defer restoreInstalledAt(req.StatePath, req.PackageName, preserveInstalledAt)
 		fallthrough
 	case OutcomeInstalled, OutcomeRepaired:
 		if cr.Outcome == OutcomeRepaired {
+			preserveInstalledAt, _ := loadInstalledAt(req.StatePath, req.PackageName)
 			uninstallPlan, err := BuildUninstallPlan(UninstallRequest{
 				PackageName: req.PackageName,
 				StatePath:   req.StatePath,
@@ -218,6 +225,7 @@ func ExecuteConvergePlan(req ConvergeRequest, cr *ConvergeResult) error {
 			if err == nil {
 				_ = ExecuteUninstallPlan(uninstallPlan, req.StatePath)
 			}
+			defer restoreInstalledAt(req.StatePath, req.PackageName, preserveInstalledAt)
 		}
 		specs, err := profile.ResolveSpecs(req.RepoRoot, req.Pkg, req.PackageName, cr.NewProfile)
 		if err != nil {
@@ -288,4 +296,35 @@ func ConvergeAll(req ConvergeAllRequest) ([]ConvergeResult, error) {
 		return results, errors.Join(errs...)
 	}
 	return results, nil
+}
+
+func loadInstalledAt(statePath, pkgName string) (time.Time, bool) {
+	st, err := state.Load(statePath)
+	if err != nil {
+		return time.Time{}, false
+	}
+	pkg, ok := st[pkgName]
+	if !ok {
+		return time.Time{}, false
+	}
+	return pkg.InstalledAt, true
+}
+
+func restoreInstalledAt(statePath, pkgName string, when time.Time) {
+	if when.IsZero() {
+		return
+	}
+	unlock := state.Lock(statePath)
+	defer unlock()
+	st, err := state.Load(statePath)
+	if err != nil {
+		return
+	}
+	pkg, ok := st[pkgName]
+	if !ok {
+		return
+	}
+	pkg.InstalledAt = when
+	st[pkgName] = pkg
+	_ = state.Save(statePath, st)
 }

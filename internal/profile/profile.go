@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -14,14 +15,29 @@ import (
 // across remote rices. A Resolver tracks visited (repoRoot, remote, package,
 // profile) tuples to detect import cycles.
 type Resolver struct {
-	RepoRoot string
-	remote   string
-	visited  map[string]bool
+	RepoRoot   string
+	remote     string
+	visited    map[string]bool
+	remoteChain []string
 }
 
 // NewResolver creates a Resolver scoped to the given repo root.
 func NewResolver(repoRoot string) *Resolver {
 	return &Resolver{RepoRoot: repoRoot, visited: make(map[string]bool)}
+}
+
+// cycleError reports a cycle as a human-readable arrow path of remote names,
+// e.g. "a -> b -> a". Falls back to the visited key when the chain is empty.
+type cycleError struct {
+	chain []string
+	key   string
+}
+
+func (e *cycleError) Error() string {
+	if len(e.chain) > 0 {
+		return fmt.Sprintf("import cycle detected: %s", strings.Join(e.chain, " -> "))
+	}
+	return fmt.Sprintf("import cycle detected: %s", e.key)
 }
 
 // ResolveSpecs returns the ordered list of SourceSpec entries for the given
@@ -31,7 +47,7 @@ func NewResolver(repoRoot string) *Resolver {
 func (r *Resolver) ResolveSpecs(pkg *manifest.PackageDef, pkgName, profileName string) ([]manifest.SourceSpec, error) {
 	key := r.RepoRoot + "|" + r.remote + "|" + pkgName + "|" + profileName
 	if r.visited[key] {
-		return nil, fmt.Errorf("import cycle detected: %s", key)
+		return nil, &cycleError{chain: append([]string(nil), r.remoteChain...), key: key}
 	}
 	r.visited[key] = true
 
@@ -51,6 +67,10 @@ func (r *Resolver) ResolveSpecs(pkg *manifest.PackageDef, pkgName, profileName s
 	if prof.Import != "" {
 		importedSpecs, err := r.resolveImport(prof.Import)
 		if err != nil {
+			var cyc *cycleError
+			if errors.As(err, &cyc) {
+				return nil, err
+			}
 			return nil, fmt.Errorf("package %q profile %q import: %w", pkgName, profileName, err)
 		}
 		result = append(result, importedSpecs...)
@@ -81,12 +101,18 @@ func (r *Resolver) resolveImport(importStr string) ([]manifest.SourceSpec, error
 		return nil, fmt.Errorf("package %q not found in remote rice %q", spec.Package, spec.Remote)
 	}
 
-	// Sub-imports inside the remote are resolved against the SAME root so
-	// that "remotes/<name>" always refers to a sibling under the original
-	// repo's remotes/ dir. This is what makes A->B->A cycles detectable.
-	remoteResolver := &Resolver{RepoRoot: r.RepoRoot, remote: spec.Remote, visited: r.visited}
+	remoteResolver := &Resolver{
+		RepoRoot:    r.RepoRoot,
+		remote:      spec.Remote,
+		visited:     r.visited,
+		remoteChain: append(append([]string(nil), r.remoteChain...), spec.Remote),
+	}
 	remoteSpecs, err := remoteResolver.ResolveSpecs(&remotePkg, spec.Package, spec.Profile)
 	if err != nil {
+		var cyc *cycleError
+		if errors.As(err, &cyc) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("remote %q: %w", spec.Remote, err)
 	}
 

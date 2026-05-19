@@ -26,7 +26,6 @@ func BuildUninstallPlan(req UninstallRequest) (*plan.Plan, error) {
 		zap.String("package", req.PackageName),
 	)
 
-	// 1. Load state from req.StatePath
 	s, err := state.Load(req.StatePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load state: %w", err)
@@ -73,7 +72,9 @@ func ExecuteUninstallPlan(p *plan.Plan, statePath string) error {
 		zap.String("package", p.PackageName),
 	)
 
-	// 1. Load state from statePath
+	unlock := state.Lock(statePath)
+	defer unlock()
+
 	s, err := state.Load(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to load state: %w", err)

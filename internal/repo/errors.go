@@ -15,8 +15,10 @@ var ErrRemoteNotFound = errors.New("remote not found")
 
 var ErrRemoteInUse = errors.New("remote is referenced by an import; remove the import from rice.toml first")
 
-var ErrSubmoduleNotInitialized = errors.New("remote is not initialized; run `rice remote update <name>`")
+var ErrSubmoduleNotInitialized = errors.New("remote is not initialized; run `rice remote add <url>` and `rice remote update <name>`")
+
+var ErrDetachedHEAD = errors.New("repo: HEAD is detached (no current branch)")
 
 func ErrPackageNotDeclared(name string) error {
-	return fmt.Errorf("package %q not declared in rice.toml", name)
+	return fmt.Errorf("package %q not declared in rice.toml; run `rice status` to list available packages", name)
 }

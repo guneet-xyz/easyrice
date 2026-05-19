@@ -2,6 +2,7 @@ package repo
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // SubmoduleState represents the initialization/modification state of a submodule
@@ -48,6 +50,9 @@ func IsGitRepo(repoPath string) (bool, error) {
 // IsClean reports whether the working tree has no uncommitted changes.
 // Runs: git -C <repoPath> status --porcelain
 func IsClean(ctx context.Context, repoPath string) (bool, error) {
+	if err := ensureRepoExists(repoPath); err != nil {
+		return false, err
+	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "status", "--porcelain")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -66,21 +71,44 @@ func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
 }
 
 // CurrentBranch returns the name of the currently checked-out branch.
+// Returns ErrDetachedHEAD when HEAD is detached.
 // Runs: git -C <repoPath> branch --show-current
 func CurrentBranch(ctx context.Context, repoPath string) (string, error) {
+	if err := ensureRepoExists(repoPath); err != nil {
+		return "", err
+	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--show-current")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git branch --show-current: %w: %s", err, out)
 	}
-	return strings.TrimSpace(string(out)), nil
+	branch := strings.TrimSpace(string(out))
+	if branch == "" {
+		return "", ErrDetachedHEAD
+	}
+	return branch, nil
+}
+
+func ensureRepoExists(repoPath string) error {
+	if _, err := os.Stat(repoPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("%w: %s", ErrRepoNotInitialized, repoPath)
+		}
+		return err
+	}
+	return nil
 }
 
 // CommitPaths stages the given paths and creates a commit with the given message.
-// Returns an error if paths is empty. NEVER uses `git add -A` or `git add .`.
+// Returns an error if paths is empty or any path is absolute. NEVER uses `git add -A` or `git add .`.
 func CommitPaths(ctx context.Context, repoPath string, paths []string, message string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("CommitPaths: paths must not be empty")
+	}
+	for _, p := range paths {
+		if filepath.IsAbs(p) {
+			return fmt.Errorf("CommitPaths: paths must be relative to the repo root, got absolute path %q", p)
+		}
 	}
 	addArgs := append([]string{"-C", repoPath, "add", "--"}, paths...)
 	cmd := exec.CommandContext(ctx, "git", addArgs...)
@@ -97,22 +125,45 @@ func CommitPaths(ctx context.Context, repoPath string, paths []string, message s
 }
 
 // SubmoduleAdd adds a git submodule at relPath pointing to url.
+// Refuses to add when the working tree is dirty (ErrRepoDirty) or when a
+// submodule already exists at relPath (ErrRemoteAlreadyExists).
 // Runs: git -C <repoPath> submodule add -- <url> <relPath>
 func SubmoduleAdd(ctx context.Context, repoPath, url, relPath string) error {
+	if dirty, derr := HasUncommittedChanges(ctx, repoPath); derr == nil && dirty {
+		return ErrRepoDirty
+	}
+	if _, err := os.Stat(filepath.Join(repoPath, relPath)); err == nil {
+		return fmt.Errorf("%w: %s", ErrRemoteAlreadyExists, relPath)
+	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "submodule", "add", "--", url, relPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		outStr := string(out)
+		if strings.Contains(outStr, "already exists in the index") {
+			return fmt.Errorf("%w: %s: %s", ErrRemoteAlreadyExists, relPath, outStr)
+		}
 		return fmt.Errorf("git submodule add: %w: %s", err, out)
 	}
 	return nil
 }
 
 // SubmoduleRemove removes a git submodule at relPath.
+// Refuses to remove when relPath does not exist (ErrRemoteNotFound) or when
+// any profile in rice.toml still imports from this remote (ErrRemoteInUse).
 // Runs: git -C <repoPath> submodule deinit -f -- <relPath>
 //
 //	git -C <repoPath> rm -f -- <relPath>
 //	os.RemoveAll(<repoPath>/.git/modules/<relPath>)
 func SubmoduleRemove(ctx context.Context, repoPath, relPath string) error {
+	if _, err := os.Stat(filepath.Join(repoPath, relPath)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("%w: %s", ErrRemoteNotFound, relPath)
+		}
+		return err
+	}
+	if used, name, err := remoteImportedByManifest(repoPath, relPath); err == nil && used {
+		return fmt.Errorf("%w: %s", ErrRemoteInUse, name)
+	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "submodule", "deinit", "-f", "--", relPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -129,10 +180,30 @@ func SubmoduleRemove(ctx context.Context, repoPath, relPath string) error {
 	return nil
 }
 
+// remoteImportedByManifest does a text scan of <repoPath>/rice.toml looking
+// for an `import = "remotes/<name>#..."` reference that matches relPath
+// (expected form "remotes/<name>"). Avoids importing manifest to keep this
+// package free of toml parsing.
+func remoteImportedByManifest(repoPath, relPath string) (bool, string, error) {
+	name := strings.TrimPrefix(relPath, "remotes/")
+	tomlPath := filepath.Join(repoPath, "rice.toml")
+	data, err := os.ReadFile(tomlPath)
+	if err != nil {
+		return false, name, err
+	}
+	needle := "remotes/" + name + "#"
+	if bytes.Contains(data, []byte(needle)) {
+		return true, name, nil
+	}
+	return false, name, nil
+}
+
 // SubmoduleUpdate initializes and updates submodules.
 // If relPath is empty, updates all submodules.
 // Runs: git -C <repoPath> submodule update --init --remote [-- <relPath>]
 func SubmoduleUpdate(ctx context.Context, repoPath, relPath string) error {
+	submoduleUpdateMu.Lock()
+	defer submoduleUpdateMu.Unlock()
 	args := []string{"-C", repoPath, "submodule", "update", "--init", "--remote"}
 	if relPath != "" {
 		args = append(args, "--", relPath)
@@ -144,6 +215,8 @@ func SubmoduleUpdate(ctx context.Context, repoPath, relPath string) error {
 	}
 	return nil
 }
+
+var submoduleUpdateMu sync.Mutex
 
 // SubmoduleList returns the list of submodules in the repo.
 // Parses output of: git -C <repoPath> submodule status

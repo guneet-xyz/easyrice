@@ -51,6 +51,9 @@ func Clone(ctx context.Context, url, dest string) error {
 }
 
 func Pull(ctx context.Context, repoPath string) error {
+	if dirty, err := HasUncommittedChanges(ctx, repoPath); err == nil && dirty {
+		return ErrRepoDirty
+	}
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "pull")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

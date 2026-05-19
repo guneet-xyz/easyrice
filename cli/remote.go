@@ -112,7 +112,7 @@ func runRemoteAdd(cmd *cobra.Command, args []string) error {
 	relPath := "remotes/" + name
 	destPath := filepath.Join(repoRoot, "remotes", name)
 	if _, err := os.Stat(destPath); err == nil {
-		return repo.ErrRemoteAlreadyExists
+		return fmt.Errorf("%w: %s", repo.ErrRemoteAlreadyExists, name)
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat remote dest: %w", err)
 	}
@@ -163,7 +163,7 @@ func runRemoteRemove(cmd *cobra.Command, args []string) error {
 	destPath := filepath.Join(repoRoot, "remotes", name)
 	if _, err := os.Stat(destPath); err != nil {
 		if os.IsNotExist(err) {
-			return repo.ErrRemoteNotFound
+			return fmt.Errorf("%w: %s", repo.ErrRemoteNotFound, name)
 		}
 		return fmt.Errorf("stat remote: %w", err)
 	}
@@ -182,7 +182,7 @@ func runRemoteRemove(cmd *cobra.Command, args []string) error {
 				}
 			}
 			if len(refs) > 0 {
-				return fmt.Errorf("%w: %s", repo.ErrRemoteInUse, strings.Join(refs, ", "))
+				return fmt.Errorf("%w: remote %q used by %s", repo.ErrRemoteInUse, name, strings.Join(refs, ", "))
 			}
 		}
 	}

@@ -12,13 +12,6 @@ import (
 	"time"
 )
 
-// ErrDetachedHEAD is the sentinel BUG-142 asserts production should return
-// from CurrentBranch when HEAD is detached. It is declared here (test-only)
-// because production has not yet introduced it — that absence IS BUG-142.
-// errors.Is against this value will be false until production catches up,
-// which causes BUG-142 to FAIL at the assertion site (intended).
-var ErrDetachedHEAD = errors.New("repo: HEAD is detached (no current branch)")
-
 // TestRepo_Edges pins behavioural contracts for git CLI integration edges.
 // Each sub-test carries a BUG-NNN marker; failures here are catalogued in
 // .omo/known-bugs.md. See .omo/plans/better-tests.md lines 1661-1737.
