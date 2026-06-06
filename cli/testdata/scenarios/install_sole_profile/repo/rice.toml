@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.demo]
+description = "Demo package with a single non-default profile"
+supported_os = ["linux", "darwin"]
+
+[packages.demo.profiles.myprofile]
+sources = [{path = "myprofile", mode = "file", target = "$HOME/.config/demo"}]

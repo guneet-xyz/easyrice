@@ -1,0 +1,17 @@
+steps:
+  - name: "install demo cancelled when user types n"
+    args: ["install", "demo", "--profile", "default", "--state", "__STATE__"]
+    stdin: "n\n"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Apply this plan?"
+        - "Cancelled. No changes were made."
+      stdout_not_contains:
+        - "Installed demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"

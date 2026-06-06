@@ -1,0 +1,12 @@
+schema_version = 1
+
+[custom_dependencies.failtool]
+version_probe = ["rg", "--version"]
+
+[packages.demo]
+description = "Demo package whose dependency cannot be installed automatically"
+supported_os = ["linux", "darwin"]
+dependencies = [{name = "failtool"}]
+
+[packages.demo.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]

@@ -1,0 +1,13 @@
+.config [dir]
+.config/demo [dir]
+.config/demo/config -> <REPO>/demo/myprofile/config
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/demo [dir]
+.config/easyrice/repos/default/demo/myprofile [dir]
+.config/easyrice/repos/default/demo/myprofile/config [file]
+.config/easyrice/repos/default/rice.toml [file]
+.config/easyrice/state.json [file]

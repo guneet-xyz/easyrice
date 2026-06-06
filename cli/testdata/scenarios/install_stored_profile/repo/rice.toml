@@ -1,0 +1,11 @@
+schema_version = 1
+
+[packages.demo]
+description = "Demo package with default and macbook profiles"
+supported_os = ["linux", "darwin"]
+
+[packages.demo.profiles.default]
+sources = [{path = "default", mode = "file", target = "$HOME/.config/demo"}]
+
+[packages.demo.profiles.macbook]
+sources = [{path = "macbook", mode = "file", target = "$HOME/.config/demo"}]

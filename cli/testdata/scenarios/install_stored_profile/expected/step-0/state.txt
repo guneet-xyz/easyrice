@@ -1,0 +1,7 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [],
+    "profile": "macbook"
+  }
+}

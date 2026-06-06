@@ -1,0 +1,9 @@
+schema_version = 1
+
+[packages.demo]
+description = "Demo package with a dependency that would fail probing"
+supported_os = ["linux", "darwin"]
+dependencies = [{name = "ripgrep"}]
+
+[packages.demo.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]

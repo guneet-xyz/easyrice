@@ -38,6 +38,21 @@ var scenarioMockRegistry = map[string]func(testing.TB){
 		DepsRunner = mock
 		t.Cleanup(func() { DepsRunner = orig })
 	},
+	// deps_fail_mock injects a deps.MockRunner that reports `rg --version`
+	// fails (exit 1, "error" on combined output). Used by scenarios that need
+	// to drive the dep check into a missing-dependency path. Restores the
+	// previous DepsRunner via t.Cleanup.
+	"deps_fail_mock": func(t testing.TB) {
+		t.Helper()
+		mock := &deps.MockRunner{
+			Expectations: []deps.MockExpectation{
+				{Argv: []string{"rg", "--version"}, Result: deps.RunResult{ExitCode: 1, Combined: []byte("error\n")}},
+			},
+		}
+		orig := DepsRunner
+		DepsRunner = mock
+		t.Cleanup(func() { DepsRunner = orig })
+	},
 }
 
 // newScenarioConfig builds a scenario.Config wired to the real cobra rootCmd.
