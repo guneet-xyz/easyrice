@@ -1,0 +1,27 @@
+steps:
+  - name: "install demo for setup"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+
+  - name: "uninstall demo - user cancels"
+    args: ["uninstall", "demo", "--state", "__STATE__"]
+    stdin: "n\n"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Cancelled"
+      home: "expected/step-1/home.txt"
+      state: "expected/step-1/state.txt"
