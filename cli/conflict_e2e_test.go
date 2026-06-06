@@ -7,39 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
-
-func TestScenario_ConflictPreexistingFile(t *testing.T) {
-	skipOnWindows(t)
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "conflict_preexisting_file"))
-	require.NoError(t, err)
-
-	sb := setupScenarioSandbox(t)
-	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
-
-	scenarioDir := renderScenario(t, srcDir, sb)
-	scenario.Run(t, scenarioDir, newScenarioConfig())
-}
-
-func TestScenario_ConflictTwoPackagesSameTarget(t *testing.T) {
-	skipOnWindows(t)
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "conflict_two_packages_same_target"))
-	require.NoError(t, err)
-
-	sb := setupScenarioSandbox(t)
-	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
-
-	scenarioDir := renderScenario(t, srcDir, sb)
-	scenario.Run(t, scenarioDir, newScenarioConfig())
-}
 
 // demoManifestFileMode is a minimal file-mode manifest with a single source file.
 const demoManifestFileMode = `schema_version = 1

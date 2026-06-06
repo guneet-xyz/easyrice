@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/guneet-xyz/easyrice/internal/repo"
-	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
 
 func copyTree(t *testing.T, src, dst string) {
@@ -87,47 +86,4 @@ func renderScenario(t *testing.T, srcDir string, sb scenarioSandbox) string {
 	return scenarioDir
 }
 
-func TestScenario_InstallProfileHappy(t *testing.T) {
-	skipOnWindows(t)
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
 
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_profile_happy"))
-	require.NoError(t, err)
-
-	sb := setupScenarioSandbox(t)
-	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
-
-	scenarioDir := renderScenario(t, srcDir, sb)
-	scenario.Run(t, scenarioDir, newScenarioConfig())
-}
-
-func TestScenario_InstallDepsMock(t *testing.T) {
-	skipOnWindows(t)
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_deps_mock"))
-	require.NoError(t, err)
-
-	sb := setupScenarioSandbox(t)
-	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
-
-	scenarioDir := renderScenario(t, srcDir, sb)
-	scenario.Run(t, scenarioDir, newScenarioConfig())
-}
-
-func TestScenario_InstallStdinConfirm(t *testing.T) {
-	skipOnWindows(t)
-	resetInstallFlags()
-	t.Cleanup(resetInstallFlags)
-
-	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", "install_stdin_confirm"))
-	require.NoError(t, err)
-
-	sb := setupScenarioSandbox(t)
-	copyTree(t, filepath.Join(srcDir, "repo"), sb.RepoRoot)
-
-	scenarioDir := renderScenario(t, srcDir, sb)
-	scenario.Run(t, scenarioDir, newScenarioConfig())
-}

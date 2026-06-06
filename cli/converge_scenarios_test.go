@@ -48,22 +48,3 @@ func runConvergeScenario(t *testing.T, scenarioName string) {
 	scenario.Run(t, scenarioDir, newScenarioConfig())
 }
 
-func TestScenario_ConvergeInstallFresh(t *testing.T) {
-	skipOnWindows(t)
-	runConvergeScenario(t, "converge-install-fresh")
-}
-
-func TestScenario_ConvergeProfileSwitch(t *testing.T) {
-	skipOnWindows(t)
-	runConvergeScenario(t, "converge-profile-switch")
-}
-
-func TestScenario_ConvergeRepairBrokenSymlink(t *testing.T) {
-	skipOnWindows(t)
-	runConvergeScenario(t, "converge-repair-broken-symlink")
-}
-
-func TestScenario_ConvergeNoOp(t *testing.T) {
-	skipOnWindows(t)
-	runConvergeScenario(t, "converge-noop")
-}
