@@ -1,0 +1,17 @@
+steps:
+  - name: "status shows BROKEN with stale state entries"
+    args: ["status", "demo", "--state", "__STATE__"]
+    mutate:
+      - op: mkdir
+        path: "<HOME>/.config/easyrice"
+      - op: write_file
+        path: "<HOME>/.config/easyrice/state.json"
+        content: '{"demo":{"profile":"default","installed_links":[{"source":"/nonexistent/source","target":"<HOME>/.config/demo/config"}],"installed_at":"2024-01-01T00:00:00Z"}}'
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "BROKEN"

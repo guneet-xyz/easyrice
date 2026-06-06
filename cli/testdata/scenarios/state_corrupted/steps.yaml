@@ -1,0 +1,17 @@
+steps:
+  - name: "status fails with invalid JSON in state.json"
+    args: ["status", "--state", "__STATE__"]
+    mutate:
+      - op: mkdir
+        path: "<HOME>/.config/easyrice"
+      - op: write_file
+        path: "<HOME>/.config/easyrice/state.json"
+        content: '{invalid json content'
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stderr_contains:
+        - "load state:"
