@@ -85,5 +85,3 @@ func renderScenario(t *testing.T, srcDir string, sb scenarioSandbox) string {
 	require.NoError(t, os.WriteFile(stepsPath, []byte(rendered), 0o644))
 	return scenarioDir
 }
-
-

@@ -103,4 +103,3 @@ func runScenarioFromTestdata(t *testing.T, scenarioName string) {
 // | TestE2E_Install_MalformedManifest_Error               | INLINE  | error-string assertion               |
 // | TestE2E_Install_StateFileMissing_CreatedFresh         | INLINE  | --state path outside <HOME> sandbox  |
 // | TestE2E_Install_StateFileCorrupted_Errors             | INLINE  | byte-equality on corrupted state     |
-

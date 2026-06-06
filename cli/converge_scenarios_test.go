@@ -47,4 +47,3 @@ func runConvergeScenario(t *testing.T, scenarioName string) {
 
 	scenario.Run(t, scenarioDir, newScenarioConfig())
 }
-

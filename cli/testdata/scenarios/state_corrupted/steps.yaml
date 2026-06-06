@@ -13,5 +13,5 @@ steps:
       EASYRICE_STATE: "__STATE__"
     expect:
       exit_code: 1
-      stderr_contains:
+      stdout_contains:
         - "load state:"
