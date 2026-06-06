@@ -1,0 +1,9 @@
+.config [dir]
+.config/base [dir]
+.config/base/basefile -> <REPO>/remotes/upstream/base/common/basefile
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/rice.toml [file]

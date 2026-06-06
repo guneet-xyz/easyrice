@@ -15,4 +15,5 @@ steps:
       EASYRICE_STATE: "__STATE__"
     expect:
       exit_code: 0
+      home: "expected/step-0/home.txt"
       state: "expected/step-0/state.txt"

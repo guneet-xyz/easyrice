@@ -15,4 +15,5 @@ steps:
       EASYRICE_STATE: "__STATE__"
     expect:
       exit_code: 1
+      stdout_contains: ["remote is not initialized; run `rice remote update"]
       state: "expected/step-0/state.txt"
