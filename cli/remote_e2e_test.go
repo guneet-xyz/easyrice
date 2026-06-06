@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -281,4 +282,65 @@ import = "remotes/base#base.common"
 	// Submodule directory must still exist.
 	_, statErr := exec.Command("test", "-d", submodulePath).CombinedOutput()
 	require.NoError(t, statErr, "submodule directory should still exist at %s", submodulePath)
+}
+
+// TestScenario_RemoteAddInvalidName verifies `rice remote add` rejects
+// --name values that don't match ^[a-zA-Z0-9_-]+$.
+// INLINE: validates --name flag validation without needing a remote repo.
+func TestScenario_RemoteAddInvalidName(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	root := makeManagedRepo(t, "")
+	_ = root // suppress unused warning
+
+	// Run remote add with an invalid name (contains space)
+	out, err := runRemoteCmd(t, "remote", "add", "https://example.com/upstream.git", "--name", "bad name with spaces")
+	require.Error(t, err)
+	assert.Contains(t, out, "invalid")
+}
+
+// TestScenario_RemoteAddMissingRiceToml verifies `rice remote add` fails
+// when the remote repo does not contain a rice.toml, and the submodule is
+// rolled back (remotes/<name>/ does not exist after the error).
+// INLINE: creates a bare upstream without rice.toml, asserts rollback.
+func TestScenario_RemoteAddMissingRiceToml(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	root := makeManagedRepo(t, "")
+
+	// Create a bare upstream WITHOUT rice.toml
+	bareDir := t.TempDir()
+	gitRunRemote(t, bareDir, "init", "--bare", "-b", "main", "upstream.git")
+
+	// Create a working tree, add a dummy file (NOT rice.toml), push
+	wt := t.TempDir()
+	gitRunRemote(t, wt, "init", "-b", "main")
+	gitRunRemote(t, wt, "config", "user.email", "test@test.com")
+	gitRunRemote(t, wt, "config", "user.name", "Test")
+
+	// Write a file that is NOT rice.toml
+	require.NoError(t, os.WriteFile(filepath.Join(wt, "README.md"), []byte("hello"), 0o644))
+	gitRunRemote(t, wt, "add", "--", "README.md")
+	gitRunRemote(t, wt, "commit", "-m", "init without rice.toml")
+	gitRunRemote(t, wt, "remote", "add", "origin", "file://"+filepath.Join(bareDir, "upstream.git"))
+	gitRunRemote(t, wt, "push", "origin", "main")
+
+	upstreamURL := "file://" + filepath.Join(bareDir, "upstream.git")
+
+	// Run remote add - should fail because upstream has no rice.toml
+	out, err := runRemoteCmd(t, "remote", "add", upstreamURL, "--name", "kick")
+	require.Error(t, err)
+	assert.Contains(t, out, "rice.toml")
+
+	// Verify rollback: remotes/kick should NOT exist
+	_, statErr := os.Stat(filepath.Join(root, "remotes", "kick"))
+	assert.True(t, os.IsNotExist(statErr), "remotes/kick must not exist after rollback; got %v", statErr)
 }
