@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/guneet-xyz/easyrice/internal/repo"
 	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
 
@@ -343,4 +344,78 @@ func TestScenario_RemoteAddMissingRiceToml(t *testing.T) {
 	// Verify rollback: remotes/kick should NOT exist
 	_, statErr := os.Stat(filepath.Join(root, "remotes", "kick"))
 	assert.True(t, os.IsNotExist(statErr), "remotes/kick must not exist after rollback; got %v", statErr)
+}
+
+// TestScenario_RemoteListEmpty verifies `rice remote list` with no remotes
+// shows "No remotes configured."
+func TestScenario_RemoteListEmpty(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	makeManagedRepo(t, "")
+
+	out, err := runRemoteCmd(t, "remote", "list")
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "No remotes configured.")
+}
+
+// TestScenario_RemoteListPopulated verifies `rice remote list` with 1 remote
+// shows it in the output.
+func TestScenario_RemoteListPopulated(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	makeManagedRepo(t, "")
+	upstream := setupBareUpstream(t, fixtureAbs(t, "remote_rice"))
+
+	_, err := runRemoteCmd(t, "remote", "add", upstream, "--name", "kick")
+	require.NoError(t, err)
+
+	out, err := runRemoteCmd(t, "remote", "list")
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "kick")
+	assert.Contains(t, out, "remotes/kick")
+}
+
+// TestScenario_RemoteUpdateHappy verifies `rice remote update kick` succeeds
+// when the remote exists.
+func TestScenario_RemoteUpdateHappy(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	makeManagedRepo(t, "")
+	upstream := setupBareUpstream(t, fixtureAbs(t, "remote_rice"))
+
+	_, err := runRemoteCmd(t, "remote", "add", upstream, "--name", "kick")
+	require.NoError(t, err)
+
+	out, err := runRemoteCmd(t, "remote", "update", "kick")
+	require.NoError(t, err, "out=%s", out)
+	assert.Contains(t, out, "Updated remote")
+	assert.Contains(t, out, "kick")
+}
+
+// TestScenario_RemoteUpdateNotFound verifies `rice remote update nonexistent`
+// fails with ErrRemoteNotFound.
+func TestScenario_RemoteUpdateNotFound(t *testing.T) {
+	skipOnWindows(t)
+	requireGit(t)
+	resetRemoteE2EFlags(t)
+	t.Cleanup(func() { resetRemoteE2EFlags(t) })
+
+	setIsolatedHome(t)
+	makeManagedRepo(t, "")
+
+	out, err := runRemoteCmd(t, "remote", "update", "nonexistent")
+	require.Error(t, err, "out=%s", out)
+	assert.ErrorIs(t, err, repo.ErrRemoteNotFound)
 }
