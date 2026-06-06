@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 import (
@@ -90,6 +88,7 @@ func renderScenario(t *testing.T, srcDir string, sb scenarioSandbox) string {
 }
 
 func TestScenario_InstallProfileHappy(t *testing.T) {
+	skipOnWindows(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -104,6 +103,7 @@ func TestScenario_InstallProfileHappy(t *testing.T) {
 }
 
 func TestScenario_InstallDepsMock(t *testing.T) {
+	skipOnWindows(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -118,6 +118,7 @@ func TestScenario_InstallDepsMock(t *testing.T) {
 }
 
 func TestScenario_InstallStdinConfirm(t *testing.T) {
+	skipOnWindows(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 

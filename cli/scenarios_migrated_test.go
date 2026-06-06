@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 import (
@@ -82,26 +80,32 @@ func runScenarioFromTestdata(t *testing.T, scenarioName string) {
 // | TestE2E_Uninstall_PreservesOtherPackages              | MIGRATE | uninstall_preserves_others (3 step) |
 
 func TestScenario_Uninstall_Happy(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_happy")
 }
 
 func TestScenario_Uninstall_ManuallyDeleted(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_manually_deleted")
 }
 
 func TestScenario_Uninstall_ReplacedByFile(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_replaced_by_file")
 }
 
 func TestScenario_Uninstall_ReplacedByDir(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_replaced_by_dir")
 }
 
 func TestScenario_Uninstall_FolderModeReplaced(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_folder_mode_replaced")
 }
 
 func TestScenario_Uninstall_PreservesOthers(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "uninstall_preserves_others")
 }
 
@@ -131,17 +135,21 @@ func TestScenario_Uninstall_PreservesOthers(t *testing.T) {
 // | TestE2E_Install_StateFileCorrupted_Errors             | INLINE  | byte-equality on corrupted state     |
 
 func TestScenario_Install_DeepNestedTarget(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "install_deep_nested_target")
 }
 
 func TestScenario_Install_HomeExpansion(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "install_home_expansion")
 }
 
 func TestScenario_Install_OverlayLastWins(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "install_overlay_last_wins")
 }
 
 func TestScenario_Install_NoArgsConvergesAll(t *testing.T) {
+	skipOnWindows(t)
 	runScenarioFromTestdata(t, "install_no_args_converges_all")
 }

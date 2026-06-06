@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 import (
@@ -15,6 +13,7 @@ import (
 )
 
 func TestScenario_RemoteImportResolves(t *testing.T) {
+	skipOnWindows(t)
 	requireGit(t)
 	resetRemoteE2EFlags(t)
 	t.Cleanup(func() { resetRemoteE2EFlags(t) })
@@ -41,6 +40,7 @@ import = "remotes/upstream#base.common"
 }
 
 func TestScenario_RemoteMissingSubmodule(t *testing.T) {
+	skipOnWindows(t)
 	requireGit(t)
 	resetRemoteE2EFlags(t)
 	t.Cleanup(func() { resetRemoteE2EFlags(t) })

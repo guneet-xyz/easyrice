@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 import (
@@ -14,6 +12,7 @@ import (
 )
 
 func TestScenario_ConflictPreexistingFile(t *testing.T) {
+	skipOnWindows(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -28,6 +27,7 @@ func TestScenario_ConflictPreexistingFile(t *testing.T) {
 }
 
 func TestScenario_ConflictTwoPackagesSameTarget(t *testing.T) {
+	skipOnWindows(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 

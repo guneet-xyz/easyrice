@@ -1,17 +1,24 @@
-//go:build !windows
-
 package main
 
 import (
 	"bytes"
 	"io"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/guneet-xyz/easyrice/internal/deps"
 	"github.com/guneet-xyz/easyrice/internal/state"
 	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
+
+// skipOnWindows skips the test on Windows since scenario tests require POSIX symlinks.
+func skipOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("scenario tests require POSIX symlinks")
+	}
+}
 
 // scenarioMockRegistry maps mock names to setup functions for scenario-based tests.
 // Individual test files add entries as needed.
