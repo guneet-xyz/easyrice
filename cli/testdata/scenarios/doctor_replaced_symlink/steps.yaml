@@ -1,0 +1,32 @@
+steps:
+  - name: "install demo"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+
+  - name: "doctor flags symlink replaced by real file"
+    args: ["doctor", "--state", "__STATE__"]
+    mutate:
+      - op: remove
+        path: "<HOME>/.config/demo/file1"
+      - op: write_file
+        path: "<HOME>/.config/demo/file1"
+        content: "user-data\n"
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "[ERROR]"
+        - "demo"
+        - "symlink was replaced"
+        - "file1"
+        - "issue(s)"

@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.demo]
+description = "Profile imports a remote that is not initialized"
+supported_os = ["linux", "darwin", "windows"]
+
+[packages.demo.profiles.default]
+import = "remotes/missing#base.common"
