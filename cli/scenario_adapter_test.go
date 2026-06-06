@@ -70,13 +70,15 @@ func newScenarioConfig() scenario.Config {
 			rootCmd.SetIn(os.Stdin)
 			return buf.String(), err
 		},
-		Reset: func() {
-			flagProfile = ""
-			flagYes = false
-			flagSkipDeps = false
-			flagState = state.DefaultPath()
-			flagLogLevel = ""
-		},
+	Reset: func() {
+		flagProfile = ""
+		flagYes = false
+		flagSkipDeps = false
+		flagState = state.DefaultPath()
+		flagLogLevel = ""
+		flagNoUpdateCheck = false
+		flagPlain = false
+	},
 		MockRegistry: scenarioMockRegistry,
 	}
 }

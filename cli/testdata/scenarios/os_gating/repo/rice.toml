@@ -1,0 +1,8 @@
+schema_version = 1
+
+[packages.demo]
+description = "Windows-only package"
+supported_os = ["windows"]
+
+[packages.demo.profiles.default]
+sources = [{path = "common", mode = "file", target = "$HOME/.config/demo"}]

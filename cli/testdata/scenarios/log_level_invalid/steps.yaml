@@ -1,0 +1,12 @@
+steps:
+  - name: "invalid log level causes error"
+    args: ["install", "demo", "--log-level", "bogus", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "bogus"
+        - "invalid log level"
