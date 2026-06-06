@@ -4,9 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/guneet-xyz/easyrice/internal/repo"
+	"github.com/guneet-xyz/easyrice/internal/testhelpers/scenario"
 )
 
 // scenariosNeedingCustomPrep lists scenario names that require git submodule
@@ -43,6 +47,81 @@ func discoverScenarios(t *testing.T) []string {
 	return names
 }
 
+// scenarioWantsStateInsideHome reports whether the scenario's expected
+// home.txt snapshots reference `state.json`. When true, the scenario was
+// authored against setupScenarioSandbox (state inside $HOME); otherwise
+// it was authored against runScenarioFromTestdata (state outside $HOME).
+func scenarioWantsStateInsideHome(t *testing.T, srcDir string) bool {
+	t.Helper()
+	expectedDir := filepath.Join(srcDir, "expected")
+	wants := false
+	_ = filepath.WalkDir(expectedDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if filepath.Base(path) != "home.txt" {
+			return nil
+		}
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return nil
+		}
+		if strings.Contains(string(raw), "state.json") {
+			wants = true
+		}
+		return nil
+	})
+	return wants
+}
+
+// runDiscoveredScenario drives a single scenario, picking the sandbox style
+// (state inside vs outside $HOME) based on the expected snapshots.
+func runDiscoveredScenario(t *testing.T, name string) {
+	t.Helper()
+	resetInstallFlags()
+	t.Cleanup(resetInstallFlags)
+
+	srcDir, err := filepath.Abs(filepath.Join("testdata", "scenarios", name))
+	require.NoError(t, err)
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	t.Setenv("AppData", filepath.Join(homeDir, "AppData"))
+
+	repoRoot := repo.DefaultRepoPath()
+	require.NoError(t, os.MkdirAll(repoRoot, 0o755))
+
+	repoSrc := filepath.Join(srcDir, "repo")
+	if _, err := os.Stat(repoSrc); err == nil {
+		copyTree(t, repoSrc, repoRoot)
+	}
+
+	var stateFile string
+	if scenarioWantsStateInsideHome(t, srcDir) {
+		stateFile = filepath.Join(homeDir, ".config", "easyrice", "state.json")
+		require.NoError(t, os.MkdirAll(filepath.Dir(stateFile), 0o755))
+	} else {
+		stateFile = filepath.Join(t.TempDir(), "state.json")
+	}
+
+	scenarioDir := t.TempDir()
+	copyTree(t, srcDir, scenarioDir)
+
+	stepsPath := filepath.Join(scenarioDir, "steps.yaml")
+	raw, err := os.ReadFile(stepsPath)
+	require.NoError(t, err)
+	rendered := strings.NewReplacer(
+		"__HOME__", homeDir,
+		"__REPO__", repoRoot,
+		"__STATE__", stateFile,
+	).Replace(string(raw))
+	require.NoError(t, os.WriteFile(stepsPath, []byte(rendered), 0o644))
+
+	scenario.Run(t, scenarioDir, newScenarioConfig())
+}
+
 // TestScenarios_AllDiscovered runs every auto-discoverable scenario.
 func TestScenarios_AllDiscovered(t *testing.T) {
 	skipOnWindows(t)
@@ -50,7 +129,7 @@ func TestScenarios_AllDiscovered(t *testing.T) {
 	for _, name := range scenarios {
 		name := name
 		t.Run(name, func(t *testing.T) {
-			runScenarioFromTestdata(t, name)
+			runDiscoveredScenario(t, name)
 		})
 	}
 }
