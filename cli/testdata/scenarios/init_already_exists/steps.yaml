@@ -1,0 +1,11 @@
+steps:
+  - name: "init refuses when repo already exists"
+    args: ["init", "https://github.com/example/dotfiles.git", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "already initialized"

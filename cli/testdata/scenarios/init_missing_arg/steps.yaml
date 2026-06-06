@@ -1,0 +1,11 @@
+steps:
+  - name: "init requires exactly one arg"
+    args: ["init", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "accepts 1 arg"
