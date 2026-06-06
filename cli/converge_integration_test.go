@@ -209,7 +209,7 @@ func TestIntegration_InstallNoArgs_ConvergesAll(t *testing.T) {
 }
 
 func TestIntegration_InstallWithProfile_Switches(t *testing.T) {
-	setIsolatedHome(t)
+	home := setIsolatedHome(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -217,7 +217,6 @@ func TestIntegration_InstallWithProfile_Switches(t *testing.T) {
 	makeManagedRepoWithFiles(t, mf, files)
 
 	statePath := filepath.Join(t.TempDir(), "state.json")
-	home := os.Getenv("HOME")
 	tgtA := filepath.Join(home, ".config", "demo", "a.conf")
 	tgtB := filepath.Join(home, ".config", "demo", "b.conf")
 
@@ -267,7 +266,7 @@ func TestIntegration_InstallSameProfile_NoOp(t *testing.T) {
 }
 
 func TestIntegration_InstallRepairsBrokenLink(t *testing.T) {
-	setIsolatedHome(t)
+	home := setIsolatedHome(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -277,8 +276,6 @@ func TestIntegration_InstallRepairsBrokenLink(t *testing.T) {
 
 	_, err := runRemoteCmd(t, "--state", statePath, "--yes", "install", "--profile", "default")
 	require.NoError(t, err)
-
-	home := os.Getenv("HOME")
 	link := filepath.Join(home, ".config", "alpha", "a.conf")
 	require.NoError(t, os.Remove(link), "could not remove link to simulate damage")
 
@@ -322,7 +319,7 @@ func TestIntegration_RemoteAddRemoveLifecycle(t *testing.T) {
 }
 
 func TestIntegration_ImportProfileResolves(t *testing.T) {
-	setIsolatedHome(t)
+	home := setIsolatedHome(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -350,8 +347,6 @@ import = "remotes/kick#nvim.default"
 	out, err := runRemoteCmd(t, "--state", statePath, "--yes",
 		"install", "nvim", "--profile", "default")
 	require.NoError(t, err, "out=%s", out)
-
-	home := os.Getenv("HOME")
 	target := filepath.Join(home, ".config", "nvim")
 	dst, err := os.Readlink(target)
 	require.NoError(t, err, "target should be a folder-mode symlink: %s", target)
@@ -360,7 +355,7 @@ import = "remotes/kick#nvim.default"
 }
 
 func TestIntegration_ImportPlusOverlay(t *testing.T) {
-	setIsolatedHome(t)
+	home := setIsolatedHome(t)
 	resetInstallFlags()
 	t.Cleanup(resetInstallFlags)
 
@@ -400,8 +395,6 @@ sources = [
 	out, err := runRemoteCmd(t, "--state", statePath, "--yes",
 		"install", "nvim", "--profile", "default")
 	require.NoError(t, err, "out=%s", out)
-
-	home := os.Getenv("HOME")
 	link := filepath.Join(home, ".config", "nvim", "init.lua")
 	dst, err := os.Readlink(link)
 	require.NoError(t, err)
