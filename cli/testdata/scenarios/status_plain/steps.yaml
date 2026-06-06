@@ -1,0 +1,27 @@
+steps:
+  - name: "install demo"
+    args: ["install", "demo", "--profile", "default", "--yes", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "Installed demo"
+      home: "expected/step-0/home.txt"
+      state: "expected/step-0/state.txt"
+  - name: "status --plain shows no Unicode glyphs"
+    args: ["status", "demo", "--plain", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 0
+      stdout_contains:
+        - "demo"
+      stdout_not_contains:
+        - "✓"
+        - "✗"
+        - "→"
