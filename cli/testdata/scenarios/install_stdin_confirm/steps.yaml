@@ -10,4 +10,6 @@ steps:
       exit_code: 0
       stdout_contains:
         - "Apply this plan?"
+        - "Installed demo"
       state: "expected/step-0/state.txt"
+      home: "expected/step-0/home.txt"
