@@ -220,3 +220,62 @@ The actual env values are set by the test harness to `t.TempDir()` paths; the li
 - Never point `HOME` or `EASYRICE_STATE` at the real `$HOME` of the developer's machine. Use `t.TempDir()` for both the home sandbox and the repo sandbox, then write those paths into the step `env`.
 - Snapshots only see what the sandbox contains. Anything written outside `<HOME>` or `<REPO>` falls outside containment and will fail the mutate guard.
 - Snapshot files are checked in as test fixtures. Regenerate them with care; the diff output is the source of truth when something breaks.
+
+## 9. Placeholder Syntax (Two Forms)
+
+Scenarios use two distinct placeholder syntaxes that operate at different lifecycle stages. They are not interchangeable.
+
+| Form | Where it goes | Substituted by | When |
+|------|---------------|----------------|------|
+| `__HOME__`, `__REPO__`, `__STATE__` | `steps.yaml` | `renderScenario` (`cli/scenario_run_test.go`) | Render time, before the test runs |
+| `<HOME>`, `<REPO>` | Expected snapshot files (`expected/step-N/*.txt`) | `expandPlaceholders` (`internal/testhelpers/scenario/snapshot.go`) | Compare time, just before diffing |
+
+Why two forms exist: `steps.yaml` is rewritten on disk into a temp dir before the executor parses it, so the harness needs a syntax that survives copy and replace. Expected snapshots stay on disk as-is and are only expanded in memory when compared against captured output. Different lifecycle stages, different substitution machinery, different placeholder shapes.
+
+Use `__HOME__`, `__REPO__`, `__STATE__` in `steps.yaml` for the `args`, `env`, `stdin`, and any field whose value must be a real absolute path before the CLI runs. Use `<HOME>` and `<REPO>` inside expected snapshot files so checked-in fixtures stay portable across sandbox locations. The `<STATE>` placeholder is also valid inside expected snapshots and resolves to `<HOME>/.config/easyrice/state.json`.
+
+Mutate ops are the one exception inside `steps.yaml`: their `path` and `target` fields accept `<HOME>` and `<REPO>` because they are expanded by the executor at mutate time, not during render. See section 4.
+
+Common mistake: writing `<HOME>` in `steps.yaml` outside a `mutate` op, or `__HOME__` inside an expected snapshot file. Both silently no-op. The CLI then receives the literal string `<HOME>` as an argument, or the diff fails because the expected file still contains `__HOME__` while the captured output contains a real path. If a step looks correct but the assertion diff shows raw placeholders on one side, you have crossed the streams.
+
+## 10. Mutate-only Steps Pattern
+
+The executor always invokes `cfg.Runner` once per step, even when the step's only real work is `mutate`. There is no pure-mutate step type. To express "mutate the sandbox, then assert without running a meaningful command", use `args: ["version"]` as a no-op carrier: it touches no state, exits 0, and produces deterministic stdout.
+
+Worked example, taken from `cli/testdata/scenarios/converge-repair-broken-symlink/steps.yaml`:
+
+```yaml
+- name: "break symlink"
+  args: ["version"]
+  mutate:
+    - op: remove
+      path: "<HOME>/.config/demo/file1"
+  env:
+    HOME: "__HOME__"
+    EASYRICE_REPO: "__REPO__"
+    EASYRICE_STATE: "__STATE__"
+  expect:
+    exit_code: 0
+```
+
+The mutate runs first and corrupts the sandbox. The `version` invocation then exits cleanly without observing or modifying any easyrice state. The next step in the scenario can then assert that `install` repairs the drift introduced here.
+
+Do not use `install`, `uninstall`, `update`, or any command that reads or writes state as the no-op carrier. They are not idempotent across mutates and will pollute the next step's expectations.
+
+## 11. Glob Discovery
+
+New scenarios are auto-discovered by `TestScenarios_AllDiscovered` in `cli/`; no per-scenario Go function is needed. Drop a directory under `cli/testdata/scenarios/` matching the layout below, and the next test run picks it up.
+
+Required layout:
+
+```
+cli/testdata/scenarios/<name>/
+  steps.yaml
+  repo/
+  expected/
+    step-0/
+    step-1/
+    ...
+```
+
+`steps.yaml` is mandatory. `repo/` is the seed repo content (copied into the sandbox repo root before step 0). Each `step-N/` directory holds the snapshot files referenced by that step's `expect.home`, `expect.repo`, and `expect.state`. Step indices are zero-based and must match the order in `steps.yaml`.
