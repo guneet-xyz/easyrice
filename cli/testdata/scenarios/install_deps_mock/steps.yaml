@@ -10,5 +10,6 @@ steps:
     expect:
       exit_code: 0
       stdout_contains:
-        - "demo"
+        - "Installed demo"
       state: "expected/step-0/state.txt"
+      home: "expected/step-0/home.txt"
