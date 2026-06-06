@@ -200,3 +200,28 @@ func TestRemoteList_WithRemote(t *testing.T) {
 	assert.Contains(t, out, "listed")
 	assert.Contains(t, out, "remotes/listed")
 }
+
+func TestRemoteRemove_DirtyTreeBlocks(t *testing.T) {
+	setIsolatedHome(t)
+	root := makeManagedRepo(t, "")
+	upstream := makeBareUpstreamRice(t)
+
+	_, err := runRemoteCmd(t, "remote", "add", upstream, "--name", "kick")
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filepath.Join(root, "rice.toml"),
+		[]byte("schema_version = 1\n# dirty\n"), 0o644))
+
+	out, err := runRemoteCmd(t, "remote", "remove", "kick")
+	require.Error(t, err, "out=%s", out)
+	assert.ErrorIs(t, err, repo.ErrRepoDirty)
+}
+
+func TestRemoteRemove_NotFound(t *testing.T) {
+	setIsolatedHome(t)
+	makeManagedRepo(t, "")
+
+	out, err := runRemoteCmd(t, "remote", "remove", "nonexistent")
+	require.Error(t, err, "out=%s", out)
+	assert.ErrorIs(t, err, repo.ErrRemoteNotFound)
+}
