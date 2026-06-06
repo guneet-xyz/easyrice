@@ -1,0 +1,14 @@
+steps:
+  - name: "update fails when no managed repo"
+    mutate:
+      - op: remove
+        path: "<REPO>"
+    args: ["update", "--state", "__STATE__"]
+    env:
+      HOME: "__HOME__"
+      EASYRICE_REPO: "__REPO__"
+      EASYRICE_STATE: "__STATE__"
+    expect:
+      exit_code: 1
+      stdout_contains:
+        - "easyrice repo is not initialized; run `rice init <url>` first"
