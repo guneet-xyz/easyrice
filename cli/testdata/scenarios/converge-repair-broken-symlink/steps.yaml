@@ -11,7 +11,10 @@ steps:
         - "Installed demo"
       home: "expected/step-0/home.txt"
       state: "expected/step-0/state.txt"
-  - name: "break symlink"
+  # Mutate-only step: 'rice version' is a side-effect-free no-op carrier so the
+  # executor's mandatory Runner call doesn't perturb state. The actual work is
+  # in the mutate block.
+  - name: "break symlink (mutate-only via rice version no-op)"
     args: ["version"]
     mutate:
       - op: remove
