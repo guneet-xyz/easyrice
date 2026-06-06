@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -131,6 +132,84 @@ func TestScenarios_AllDiscovered(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			runDiscoveredScenario(t, name)
 		})
+	}
+}
+
+// TestScenarios_GlobMatchesHardcoded verifies that the glob walker discovers
+// exactly the same set of scenarios as the hardcoded TestScenario_* functions
+// (plus the custom-prep skip-list). The hardcoded list below is intentionally
+// static: deriving it dynamically would defeat the purpose of detecting drift
+// between the two enumerations.
+func TestScenarios_GlobMatchesHardcoded(t *testing.T) {
+	// Hardcoded scenario names extracted from the harness files:
+	// - cli/scenario_run_test.go
+	// - cli/scenarios_migrated_test.go
+	// - cli/converge_scenarios_test.go
+	// - cli/conflict_e2e_test.go
+	// - cli/remote_e2e_test.go (custom-prep, also in scenariosNeedingCustomPrep)
+	hardcoded := []string{
+		// scenario_run_test.go
+		"install_profile_happy",
+		"install_deps_mock",
+		"install_stdin_confirm",
+		// scenarios_migrated_test.go
+		"uninstall_happy",
+		"uninstall_manually_deleted",
+		"uninstall_replaced_by_file",
+		"uninstall_replaced_by_dir",
+		"uninstall_folder_mode_replaced",
+		"uninstall_preserves_others",
+		"install_deep_nested_target",
+		"install_home_expansion",
+		"install_overlay_last_wins",
+		"install_no_args_converges_all",
+		// converge_scenarios_test.go
+		"converge-install-fresh",
+		"converge-profile-switch",
+		"converge-repair-broken-symlink",
+		"converge-noop",
+		// conflict_e2e_test.go
+		"conflict_preexisting_file",
+		"conflict_two_packages_same_target",
+	}
+	for name := range scenariosNeedingCustomPrep {
+		hardcoded = append(hardcoded, name)
+	}
+	sort.Strings(hardcoded)
+
+	discovered := discoverScenarios(t)
+	full := append([]string{}, discovered...)
+	for name := range scenariosNeedingCustomPrep {
+		full = append(full, name)
+	}
+	sort.Strings(full)
+
+	if !reflect.DeepEqual(hardcoded, full) {
+		hardcodedMap := map[string]bool{}
+		for _, n := range hardcoded {
+			hardcodedMap[n] = true
+		}
+		fullMap := map[string]bool{}
+		for _, n := range full {
+			fullMap[n] = true
+		}
+
+		var inHardcodedOnly, inDiscoveredOnly []string
+		for n := range hardcodedMap {
+			if !fullMap[n] {
+				inHardcodedOnly = append(inHardcodedOnly, n)
+			}
+		}
+		for n := range fullMap {
+			if !hardcodedMap[n] {
+				inDiscoveredOnly = append(inDiscoveredOnly, n)
+			}
+		}
+		sort.Strings(inHardcodedOnly)
+		sort.Strings(inDiscoveredOnly)
+
+		t.Errorf("glob discovery mismatch:\n  in hardcoded only: %v\n  in discovered only: %v",
+			inHardcodedOnly, inDiscoveredOnly)
 	}
 }
 
