@@ -1,0 +1,21 @@
+{
+  "demo": {
+    "installed_at": "<IGNORE>",
+    "installed_links": [
+      {
+        "source": "<REPO>/demo/filemode_dir/file1.conf",
+        "target": "<HOME>/.config/mixed/files/file1.conf"
+      },
+      {
+        "source": "<REPO>/demo/filemode_dir/file2.conf",
+        "target": "<HOME>/.config/mixed/files/file2.conf"
+      },
+      {
+        "is_dir": true,
+        "source": "<REPO>/demo/foldermode_dir",
+        "target": "<HOME>/.config/mixed/folder"
+      }
+    ],
+    "profile": "default"
+  }
+}

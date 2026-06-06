@@ -1,0 +1,11 @@
+schema_version = 1
+
+[packages.demo]
+description = "mixed file + folder modes"
+supported_os = ["linux", "darwin"]
+
+[packages.demo.profiles.default]
+sources = [
+  {path = "filemode_dir", mode = "file", target = "$HOME/.config/mixed/files"},
+  {path = "foldermode_dir", mode = "folder", target = "$HOME/.config/mixed/folder"},
+]

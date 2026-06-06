@@ -1,0 +1,18 @@
+.config [dir]
+.config/easyrice [dir]
+.config/easyrice/logs [dir]
+.config/easyrice/logs/easyrice.log [file]
+.config/easyrice/repos [dir]
+.config/easyrice/repos/default [dir]
+.config/easyrice/repos/default/demo [dir]
+.config/easyrice/repos/default/demo/filemode_dir [dir]
+.config/easyrice/repos/default/demo/filemode_dir/file1.conf [file]
+.config/easyrice/repos/default/demo/filemode_dir/file2.conf [file]
+.config/easyrice/repos/default/demo/foldermode_dir [dir]
+.config/easyrice/repos/default/demo/foldermode_dir/data.conf [file]
+.config/easyrice/repos/default/rice.toml [file]
+.config/mixed [dir]
+.config/mixed/files [dir]
+.config/mixed/files/file1.conf -> <REPO>/demo/filemode_dir/file1.conf
+.config/mixed/files/file2.conf -> <REPO>/demo/filemode_dir/file2.conf
+.config/mixed/folder -> <REPO>/demo/foldermode_dir
