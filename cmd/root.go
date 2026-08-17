@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"easyrice/utils"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -31,6 +33,8 @@ func Execute() {
 }
 
 func init() {
+	utils.SetupLogger()
+	slog.Info("Test")
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
