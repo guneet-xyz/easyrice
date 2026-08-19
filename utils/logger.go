@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"charm.land/log/v2"
 	"log/slog"
 	"os"
 )
@@ -12,10 +13,22 @@ func SetupLogger() error {
 		return err
 	}
 
-	slog.SetDefault(slog.New(slog.NewMultiHandler(slog.NewTextHandler(os.Stdin, nil), slog.NewJSONHandler(f, &slog.HandlerOptions{
+	jsonHandler := slog.NewJSONHandler(f, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: true,
-	}))))
+	})
+
+	var handler slog.Handler
+	if GetEnvOptions().Debug {
+		textHandler := log.NewWithOptions(os.Stderr, log.Options{
+			Level: log.Level(slog.LevelDebug),
+		})
+		handler = slog.NewMultiHandler(textHandler, jsonHandler)
+	} else {
+		handler = jsonHandler
+	}
+
+	slog.SetDefault(slog.New(handler))
 
 	return nil
 }
