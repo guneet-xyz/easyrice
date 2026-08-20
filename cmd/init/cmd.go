@@ -1,4 +1,4 @@
-package cmd
+package cmd_init
 
 import (
 	"easyrice/utils"
@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var initCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize easyrice",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -23,10 +23,6 @@ var initCmd = &cobra.Command{
 		}
 		slog.Debug("Ended init")
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(initCmd)
 }
 
 func firstTimeSetup() error {

@@ -3,6 +3,7 @@ package utils
 import (
 	"log/slog"
 	"os/exec"
+	"strings"
 )
 
 func CloneGitWorktree(remote string, path string) error {
@@ -51,4 +52,27 @@ func InitGitWorktree(path string) error {
 
 	slog.Debug("Initialized git worktree")
 	return nil
+}
+
+func GetBranches(path string) ([]string, error) {
+	slog.Debug("Getting branches", "path", path)
+	cmd := exec.Command("git", "branch", "--no-color")
+
+	bytes, err := cmd.Output()
+	if err != nil {
+		slog.Warn("Listing branches failed", "error", err)
+		return nil, err
+	}
+
+	out := string(bytes)
+
+	var branches []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if IsEmpty(line) {
+			continue
+		}
+		branches = append(branches, line[2:])
+	}
+
+	return branches, nil
 }

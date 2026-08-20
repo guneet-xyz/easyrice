@@ -1,4 +1,4 @@
-package cmd
+package cmd_debug
 
 import (
 	"easyrice/utils"
@@ -7,14 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var debugCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "debug",
 	Short: "debug",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Log File : %s\n", utils.LogFile)
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(debugCmd)
 }

@@ -10,6 +10,7 @@ var ConfigDir string
 var CacheDir string
 var LogFile string
 var ConfigFile string
+var RepoDir string
 
 func init() {
 	userConfigDir, err := os.UserConfigDir()
@@ -28,6 +29,7 @@ func init() {
 	CacheDir = filepath.Join(userCacheDir, "easyrice")
 	LogFile = filepath.Join(CacheDir, "easyrice.log")
 	ConfigFile = filepath.Join(ConfigDir, "easyrice.toml")
+	RepoDir = filepath.Join(ConfigDir, "repository")
 
 	err = MkdirAll(ConfigDir)
 	if err != nil {
