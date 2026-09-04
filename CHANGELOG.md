@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/guneet-xyz/easyrice/compare/v0.1.0...v0.1.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **ci:** attempt 3 ([64d7ae4](https://github.com/guneet-xyz/easyrice/commit/64d7ae4ff703183f43c037004afc127ce5ba7609))
+
 ## [0.1.0](https://github.com/guneet-xyz/easyrice/compare/v0.0.0...v0.1.0) (2026-09-04)
 
 
