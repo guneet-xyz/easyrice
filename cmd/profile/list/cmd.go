@@ -14,25 +14,11 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		slog.Debug("Called profiles list")
 
-		profiles, err := getProfiles()
+		profiles, err := utils.GetProfiles()
 		if err != nil {
-			slog.Error("Failed to get profiles list", "error", err)
-			panic(err)
+			fmt.Println("Failed to list profiles. Run with 'DEBUG=1' for more information.")
 		}
 
 		fmt.Printf("Got profiles list %s", profiles)
 	},
-}
-
-func getProfiles() ([]string, error) {
-	slog.Debug("Getting profiles")
-
-	branches, err := utils.GetBranches(utils.RepoDir)
-	if err != nil {
-		slog.Warn("Failed to get branches", "error", err)
-		return nil, err
-	}
-
-	slog.Debug("Got profiles", "profiles", branches)
-	return branches, nil
 }

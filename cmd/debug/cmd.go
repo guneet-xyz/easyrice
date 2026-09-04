@@ -12,5 +12,6 @@ var Cmd = &cobra.Command{
 	Short: "debug",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Log File : %s\n", utils.LogFile)
+		fmt.Printf("Config Dir : %s\f", utils.ConfigDir)
 	},
 }

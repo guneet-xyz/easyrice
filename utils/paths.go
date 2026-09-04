@@ -43,3 +43,10 @@ func init() {
 		panic(err)
 	}
 }
+
+func WorktreePath(branch string) string {
+	slog.Debug("Constructing worktree path", "branch", branch)
+	path := filepath.Join(RepoDir, "wt", branch)
+	slog.Debug("Generated worktree path", "path", path)
+	return path
+}

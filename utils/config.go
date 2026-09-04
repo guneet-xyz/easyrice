@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	RepositoryDir string
+	Profile       string
 }
 
 func GetConfig() (Config, error) {

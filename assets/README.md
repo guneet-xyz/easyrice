@@ -1,0 +1,3 @@
+# easyrice
+
+hi hello wasup
