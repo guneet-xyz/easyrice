@@ -1,8 +1,8 @@
-name: Release
+name: Release (Beta)
 on:
   push:
     branches:
-      - main
+      - development
 permissions:
   contents: write
   pull-requests: write
@@ -19,6 +19,9 @@ jobs:
         with:
           release-type: go
           token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          versioning-strategy: prerelease
+          path: './src'
       - name: Checkout Code
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@v4
@@ -28,7 +31,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: './src/go.mod'
           cache: true
       - name: Run GoReleaser
         if: ${{ steps.release.outputs.release_created }}
@@ -37,5 +40,6 @@ jobs:
           distribution: goreleaser
           version: latest
           args: release --clean
+          workdir: './src'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
